@@ -1,0 +1,18 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/fuzi_q_vs/.vs/fuzi_q_vs/v16/TestStore/0
+/fuzi_q_vs/.vs/fuzi_q_vs/v16
+/.vs
+/fuzi_q_vs/fuzi_qt/Debug
+/fuzi_q_vs/fuzi_q_lib/Debug/fuzi_q_lib.tlog
+/fuzi_q_vs/fuzi_q/Debug
+/fuzi_q_vs/fuzi_q_test/Debug
+/fuzi_q_vs/fuzi_q_lib/Debug
+/fuzi_q_vs/fuzi_q/x64/Debug
+/fuzi_q_vs/fuzi_qt/x64/Debug
+/fuzi_q_vs/fuzi_q_lib/x64/Debug
+/fuzi_q_vs/fuzi_q_test/x64/Debug
+/Debug
+/x64/Debug
