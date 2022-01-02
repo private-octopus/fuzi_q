@@ -88,6 +88,15 @@ uint32_t basic_fuzzer(void * fuzz_ctx, picoquic_cnx_t* cnx,
     return (uint32_t)length;
 }
 
+void basic_fuzzer_init(basic_fuzzer_ctx_t* fuzz_ctx, uint64_t tweak)
+{
+    memset(fuzz_ctx, 0, sizeof(basic_fuzzer_ctx_t));
+    /* Random seed depends on duration, so different durations do not all start
+     * with exactly the same message sequences. */
+    fuzz_ctx->random_context = 0xDEADBEEFBABACAFEull;
+    fuzz_ctx->random_context ^= tweak;
+}
+
 /*
  * Initial fuzz test.
  *

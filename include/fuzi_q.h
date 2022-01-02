@@ -69,6 +69,8 @@ typedef struct st_basic_fuzzer_ctx_t {
 uint32_t basic_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length);
 
+void basic_fuzzer_init(basic_fuzzer_ctx_t* fuzz_ctx, uint64_t tweak);
+
 /* Unification of initial and basic fuzzer
  * TODO: merge the two mechanisms in a single state
  */
@@ -104,6 +106,7 @@ typedef struct st_fuzi_q_ctx_t {
     uint32_t desired_version;
     int is_quicperf;
     int server_is_down;
+    basic_fuzzer_ctx_t fuzz_ctx;
 } fuzi_q_ctx_t;
 
 int fuzi_q_server(picoquic_quic_config_t* config);

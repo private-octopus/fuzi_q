@@ -130,7 +130,6 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
         if (ret == 0) {
             ret = picoquic_start_client_cnx(cnx_ctx->cnx_client);
         }
-
         if (ret == 0 && !fuzi_q_ctx->is_quicperf) {
             if (picoquic_is_0rtt_available(cnx_ctx->cnx_client) && (fuzi_q_ctx->proposed_version & 0x0a0a0a0a) != 0x0a0a0a0a) {
                 cnx_ctx->zero_rtt_available = 1;
@@ -167,9 +166,9 @@ int fuzi_q_set_client_context(fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_t
         nb_cnx_ctx = config->nb_connections;
     }
 
-    fuzi_q_ctx->end_of_time = (duration_max == 0)?UINT64_MAX:current_time+duration_max;
+    fuzi_q_ctx->end_of_time = (duration_max == 0)?UINT64_MAX:current_time + duration_max*1000000;
     fuzi_q_ctx->nb_cnx_required = (nb_cnx_required == 0)?SIZE_MAX: nb_cnx_required;
-
+    fuzi_q_ctx->next_success_time = current_time + fuzi_q_ctx->up_time_interval;
 
     if (fuzi_q_ctx->alpn != NULL && strcmp(fuzi_q_ctx->alpn, QUICPERF_ALPN) == 0) {
         /* Set a QUICPERF client */
@@ -205,6 +204,8 @@ int fuzi_q_set_client_context(fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_t
             ret = -1;
         }
         else {
+            basic_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+            picoquic_set_fuzz(fuzi_q_ctx->quic, basic_fuzzer, &fuzi_q_ctx->fuzz_ctx);
             picoquic_set_key_log_file_from_env(fuzi_q_ctx->quic);
 
             if (fuzi_q_ctx->config != NULL) {
@@ -281,17 +282,29 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
              * If this is a disconnected connection, clear the app level data.
              */
             picoquic_state_enum cnx_state = picoquic_get_cnx_state(cnx_ctx->cnx_client);
-            if (cnx_state == picoquic_state_ready && !cnx_ctx->success_observed) {
-                fuzi_q_ctx->next_success_time = current_time + fuzi_q_ctx->up_time_interval;
-                cnx_ctx->success_observed = 1;
+            if (cnx_state == picoquic_state_ready) {
+                if (!cnx_ctx->success_observed) {
+                    fuzi_q_ctx->next_success_time = current_time + fuzi_q_ctx->up_time_interval;
+                    cnx_ctx->success_observed = 1;
+                    if (ret == 0 && cnx_ctx->zero_rtt_available) {
+                        if (!fuzi_q_ctx->is_quicperf) {
+                            /* Start the download scenario */
+                            ret = picoquic_demo_client_start_streams(cnx_ctx->cnx_client, &cnx_ctx->callback_ctx, PICOQUIC_DEMO_STREAM_ID_INITIAL);
+                        }
+                    }
+                }
+                else if (cnx_ctx->callback_ctx.nb_open_streams == 0) {
+                    ret = picoquic_close(cnx_ctx->cnx_client, 0);
+                }
             }
             if (cnx_state == picoquic_state_disconnected) {
                 fuzi_q_release_connection(cnx_ctx);
             }
         }
         if (cnx_ctx->cnx_client == NULL){
-            if (current_time < fuzi_q_ctx->end_of_time && fuzi_q_ctx->nb_cnx_required < fuzi_q_ctx->nb_cnx_tried) {
+            if (current_time < fuzi_q_ctx->end_of_time && fuzi_q_ctx->nb_cnx_tried <  fuzi_q_ctx->nb_cnx_required) {
                 /* If the required number of trials is not done, try starting a new connection. */
+                fuzi_q_ctx->nb_cnx_tried++;
                 ret = fuzi_q_start_connection(fuzi_q_ctx, cnx_ctx, current_time);
                 nb_active++;
             }
@@ -381,6 +394,10 @@ int fuzi_q_client(const char* ip_address_text, int server_port,
     ret = fuzi_q_set_client_context(&fuzi_q_ctx, ip_address_text, server_port,
         config, nb_cnx_required, duration_max, client_scenario_text, NULL);
 
+    /* Start the client connections */
+    if (ret == 0) {
+        ret = fuzi_q_loop_check_cnx(&fuzi_q_ctx, picoquic_get_quic_time(fuzi_q_ctx.quic));
+    }
     /* Wait for packets */
     if (ret == 0) {
 #ifdef _WINDOWS
@@ -391,6 +408,8 @@ int fuzi_q_client(const char* ip_address_text, int server_port,
             fuzi_q_ctx.socket_buffer_size, client_loop_cb, &fuzi_q_ctx);
 #endif
     }
+
+    fprintf(stdout, "Exit after %zu trials, server appears %s.\n", fuzi_q_ctx.nb_cnx_tried, (fuzi_q_ctx.server_is_down) ? "down" : "up");
 
     fuzi_q_release_client_context(&fuzi_q_ctx);
 

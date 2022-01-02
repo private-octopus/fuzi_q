@@ -159,9 +159,7 @@ int main(int argc, char** argv)
                 usage();
             }
             else {
-                char const* a_d_s;
                 server_name = argv[optind++];
-                a_d_s = argv[optind++];
                 server_port = atoi(argv[optind++]);
                 if (server_port <= 0) {
                     fprintf(stderr, "Invalid server port: %s\n", optarg);
@@ -170,14 +168,12 @@ int main(int argc, char** argv)
             }
 
             if (optind < argc) {
-                usage();
-            }
-            else {
                 scenario = argv[optind++];
             }
         }
 
         if (optind < argc) {
+            fprintf(stderr, "Unexpected arguments: %s\n", argv[optind]);
             usage();
         }
     }
