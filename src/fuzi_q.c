@@ -62,20 +62,14 @@
 #include <performance_log.h>
 #include "fuzi_q.h"
 
-typedef enum {
-    fuzi_q_mode_none = 0,
-    fuzi_q_mode_server,
-    fuzi_q_mode_client
-} fuzi_q_mode_enum;
-
 
 void usage()
 {
     fprintf(stderr, "fuzi_q: over the net quic fuzzer\n");
-    fprintf(stderr, "Usage: fuzi_q <options> [mode] [server_name port [scenario]] \n");
-    fprintf(stderr, "  mode can be one of client or server.");
-    fprintf(stderr, "  For the client mode, specify server_name and port.\n");
-    fprintf(stderr, "  For the server mode, use -p to specify the port,\n");
+    fprintf(stderr, "Usage: fuzi_q <options> [fuzz_mode] [server_name port [scenario]] \n");
+    fprintf(stderr, "  fuzz_mode can be one of client, clean or server.");
+    fprintf(stderr, "  For the client or clean fuzz_mode, specify server_name and port.\n");
+    fprintf(stderr, "  For the server fuzz_mode, use -p to specify the port,\n");
     fprintf(stderr, "  and also -c and -k for certificate and matching private key.\n");
     picoquic_config_usage();
     fprintf(stderr, "fuzi_q options:\n");
@@ -91,7 +85,7 @@ int main(int argc, char** argv)
     char option_string[512];
     int opt;
     int ret = 0;
-    fuzi_q_mode_enum mode = 0;
+    fuzi_q_mode_enum fuzz_mode = 0;
     const char* server_name = NULL;
     int server_port = -1;
     size_t nb_cnx_ctx = 1;
@@ -140,22 +134,32 @@ int main(int argc, char** argv)
 
     /* Simplified style params */
     if (optind < argc) {
-        char const* a_mode = argv[optind++];
-        if (strcmp(a_mode, "client") == 0) {
-            mode = fuzi_q_mode_client;
+        char const* a_fuzz_mode = argv[optind++];
+        if (strcmp(a_fuzz_mode, "client") == 0) {
+            fuzz_mode = fuzi_q_mode_client;
         }
-        else if (strcmp(a_mode, "server") == 0) {
-            mode = fuzi_q_mode_server;
+        else if (strcmp(a_fuzz_mode, "server") == 0) {
+            fuzz_mode = fuzi_q_mode_server;
+        }
+        else if (strcmp(a_fuzz_mode, "clean") == 0) {
+            fuzz_mode = fuzi_q_mode_clean;
+        }
+        else {
+            fprintf(stdout, "Fuzz mode incorrect, %s\n", a_fuzz_mode);
         }
     }
+    else {
+        fprintf(stdout, "Fuzz mode not specified.\n");
+    }
 
-    if (mode == fuzi_q_mode_none){
+    if (fuzz_mode == fuzi_q_mode_none){
         usage();
     }
     else
     {
-        if (mode == fuzi_q_mode_client) {
+        if (fuzz_mode == fuzi_q_mode_client || fuzz_mode == fuzi_q_mode_clean) {
             if (optind + 2 > argc) {
+                fprintf(stdout, "Expected server and port after fuzz mode\n");
                 usage();
             }
             else {
@@ -179,11 +183,11 @@ int main(int argc, char** argv)
     }
 
     /* Run */
-    if (mode == fuzi_q_mode_client) {
-        ret = fuzi_q_client(server_name, server_port, &config, nb_fuzz_trials, fuzz_duration_max, scenario);
+    if (fuzz_mode == fuzi_q_mode_client || fuzz_mode == fuzi_q_mode_clean) {
+        ret = fuzi_q_client(fuzz_mode, server_name, server_port, &config, nb_fuzz_trials, fuzz_duration_max, scenario);
     }
     else {
-        ret = fuzi_q_server(&config);
+        ret = fuzi_q_server(fuzz_mode, &config, fuzz_duration_max);
     }
     /* Clean up */
     picoquic_config_clear(&config);

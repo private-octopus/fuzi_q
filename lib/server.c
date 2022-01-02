@@ -35,17 +35,11 @@
  * `picoquic_demo_server_callback_select_alpn`
  */
 
-typedef struct st_server_loop_cb_t {
-    int just_once;
-    int first_connection_seen;
-    int connection_done;
-} server_loop_cb_t;
-
 int fuzi_q_server_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb_mode,
     void* callback_ctx, void* callback_arg)
 {
     int ret = 0;
-    server_loop_cb_t* cb_ctx = (server_loop_cb_t*)callback_ctx;
+    fuzi_q_ctx_t* cb_ctx = (fuzi_q_ctx_t*)callback_ctx;
 
     if (cb_ctx == NULL) {
         ret = PICOQUIC_ERROR_UNEXPECTED_ERROR;
@@ -72,14 +66,13 @@ int fuzi_q_server_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
 /* Fuzi Quic Server
  * TODO: manage loop options like key updates, migrations, etc. 
  */
-int fuzi_q_server(picoquic_quic_config_t* config)
+int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, uint64_t duration_max)
 {
     /* Start: start the QUIC process with cert and key files */
     int ret = 0;
-    picoquic_quic_t* qserver = NULL;
     uint64_t current_time = 0;
     picohttp_server_parameters_t picoquic_file_param = { 0 };
-    server_loop_cb_t loop_cb_ctx = { 0 };
+    fuzi_q_ctx_t fuzi_q_ctx = { 0 };
 
     picoquic_file_param.web_folder = config->www_dir;
 
@@ -94,23 +87,26 @@ int fuzi_q_server(picoquic_quic_config_t* config)
     }
 #endif
     if (ret == 0) {
-        qserver = picoquic_create_and_configure(config, picoquic_demo_server_callback, &picoquic_file_param, current_time, NULL);
-        if (qserver == NULL) {
+        fuzi_q_ctx.quic = picoquic_create_and_configure(config, picoquic_demo_server_callback, &picoquic_file_param, current_time, NULL);
+        if (fuzi_q_ctx.quic == NULL) {
             ret = -1;
         }
         else {
-            picoquic_set_key_log_file_from_env(qserver);
+            fuzi_q_ctx.fuzz_mode = fuzz_mode;
+            basic_fuzzer_init(&fuzi_q_ctx.fuzz_ctx, duration_max);
+            picoquic_set_fuzz(fuzi_q_ctx.quic, basic_fuzzer, &fuzi_q_ctx.fuzz_ctx);
+            picoquic_set_key_log_file_from_env(fuzi_q_ctx.quic);
 
-            picoquic_set_alpn_select_fn(qserver, picoquic_demo_server_callback_select_alpn);
+            picoquic_set_alpn_select_fn(fuzi_q_ctx.quic, picoquic_demo_server_callback_select_alpn);
 
-            picoquic_set_mtu_max(qserver, config->mtu_max);
+            picoquic_set_mtu_max(fuzi_q_ctx.quic, config->mtu_max);
             if (config->qlog_dir != NULL)
             {
-                picoquic_set_qlog(qserver, config->qlog_dir);
+                picoquic_set_qlog(fuzi_q_ctx.quic, config->qlog_dir);
             }
             if (config->performance_log != NULL)
             {
-                ret = picoquic_perflog_setup(qserver, config->performance_log);
+                ret = picoquic_perflog_setup(fuzi_q_ctx.quic, config->performance_log);
             }
 #if 0
             if (ret == 0 && config->cnx_id_cbdata != NULL) {
@@ -120,7 +116,7 @@ int fuzi_q_server(picoquic_quic_config_t* config)
                     fprintf(stdout, "Cannot parse the CNX_ID config policy: %s.\n", config->cnx_id_cbdata);
                 }
                 else {
-                    ret = picoquic_lb_compat_cid_config(qserver, &lb_config);
+                    ret = picoquic_lb_compat_cid_config(fuzi_q_ctx.quic, &lb_config);
                     if (ret != 0) {
                         fprintf(stdout, "Cannot set the CNX_ID config policy: %s.\n", config->cnx_id_cbdata);
                     }
@@ -133,19 +129,19 @@ int fuzi_q_server(picoquic_quic_config_t* config)
     if (ret == 0) {
         /* Wait for packets */
 #if _WINDOWS
-        ret = picoquic_packet_loop_win(qserver, config->server_port, 0, config->dest_if,
-            config->socket_buffer_size, fuzi_q_server_loop_cb, &loop_cb_ctx);
+        ret = picoquic_packet_loop_win(fuzi_q_ctx.quic, config->server_port, 0, config->dest_if,
+            config->socket_buffer_size, fuzi_q_server_loop_cb, &fuzi_q_ctx);
 #else
-        ret = picoquic_packet_loop(qserver, config->server_port, 0, config->dest_if,
-            config->socket_buffer_size, config->do_not_use_gso, fuzi_q_server_loop_cb, &loop_cb_ctx);
+        ret = picoquic_packet_loop(fuzi_q_ctx.quic, config->server_port, 0, config->dest_if,
+            config->socket_buffer_size, config->do_not_use_gso, fuzi_q_server_loop_cb, &fuzi_q_ctx);
 #endif
     }
 
     /* And exit */
     printf("Server exit, ret = 0x%x\n", ret);
 
-    if (qserver != NULL) {
-        picoquic_free(qserver);
+    if (fuzi_q_ctx.quic != NULL) {
+        picoquic_free(fuzi_q_ctx.quic);
     }
 
     return ret;

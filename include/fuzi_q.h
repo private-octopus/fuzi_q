@@ -35,6 +35,15 @@
 extern "C" {
 #endif
 
+/* Operation modes for the fuzzer
+ */
+typedef enum {
+    fuzi_q_mode_none = 0,
+    fuzi_q_mode_server,
+    fuzi_q_mode_client,
+    fuzi_q_mode_clean
+} fuzi_q_mode_enum;
+
 /*
 * Initial fuzz test.
 *
@@ -85,15 +94,18 @@ typedef struct st_fuzi_q_cnx_ctx_t {
 } fuzi_q_cnx_ctx_t;
 
 typedef struct st_fuzi_q_ctx_t {
-    /* Data required to start client connections */
+    fuzi_q_mode_enum fuzz_mode;
     picoquic_quic_config_t* config;
     picoquic_quic_t* quic;
+    /* Data used by client and server */
+    const char* sni;
+    const char* alpn;
+    size_t socket_buffer_size;
+    /* Data required to start client connections */
     struct sockaddr_storage server_address;
     char const* client_scenario_text;
     size_t client_sc_nb;
     picoquic_demo_stream_desc_t* client_sc;
-    const char* sni;
-    const char* alpn;
     uint64_t end_of_time;
     uint64_t up_time_interval;
     uint64_t next_success_time;
@@ -101,16 +113,16 @@ typedef struct st_fuzi_q_ctx_t {
     size_t nb_cnx_ctx;
     size_t nb_cnx_tried;
     size_t nb_cnx_required;
-    size_t socket_buffer_size;
     uint32_t proposed_version;
     uint32_t desired_version;
     int is_quicperf;
     int server_is_down;
+    /* Management of fuzzing. */
     basic_fuzzer_ctx_t fuzz_ctx;
 } fuzi_q_ctx_t;
 
-int fuzi_q_server(picoquic_quic_config_t* config);
-int fuzi_q_client(const char* ip_address_text, int server_port,
+int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, uint64_t duration_max);
+int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
     char const* client_scenario_text);
 

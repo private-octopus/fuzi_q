@@ -144,10 +144,10 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
 
 static const char* test_scenario_default = "0:index.html;4:test.html;8:/1234567;12:main.jpg;16:war-and-peace.txt;20:en/latest/;24:/file-123K";
 
-/* Set quic context for client run
- * TODO: consider support of virtual time for qualification tests
+/* Set quic context for client run.
+ * 
  */
-int fuzi_q_set_client_context(fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_text, int server_port,
+int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max, 
     char const* client_scenario_text, uint64_t* virtual_time)
 {
@@ -155,6 +155,7 @@ int fuzi_q_set_client_context(fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_t
     uint64_t current_time = (virtual_time == NULL)?picoquic_current_time(): *virtual_time;
     size_t nb_cnx_ctx = 1;
 
+    fuzi_q_ctx->fuzz_mode = fuzz_mode;
     fuzi_q_ctx->config = config;
     fuzi_q_ctx->up_time_interval = 10000000; /* Use 10 seonds by default */
     if (config != NULL) {
@@ -204,8 +205,10 @@ int fuzi_q_set_client_context(fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_t
             ret = -1;
         }
         else {
-            basic_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
-            picoquic_set_fuzz(fuzi_q_ctx->quic, basic_fuzzer, &fuzi_q_ctx->fuzz_ctx);
+            if (fuzz_mode != fuzi_q_mode_clean) {
+                basic_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+                picoquic_set_fuzz(fuzi_q_ctx->quic, basic_fuzzer, &fuzi_q_ctx->fuzz_ctx);
+            }
             picoquic_set_key_log_file_from_env(fuzi_q_ctx->quic);
 
             if (fuzi_q_ctx->config != NULL) {
@@ -383,7 +386,7 @@ int fuzi_q_client_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
 /* Fuzi Quic Client
  * TODO: manage loop options like key updates, migrations, etc. 
  */
-int fuzi_q_client(const char* ip_address_text, int server_port,
+int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
     char const* client_scenario_text)
 {
@@ -391,7 +394,7 @@ int fuzi_q_client(const char* ip_address_text, int server_port,
     int ret = 0;
     fuzi_q_ctx_t fuzi_q_ctx = { 0 };
 
-    ret = fuzi_q_set_client_context(&fuzi_q_ctx, ip_address_text, server_port,
+    ret = fuzi_q_set_client_context(fuzz_mode, &fuzi_q_ctx, ip_address_text, server_port,
         config, nb_cnx_required, duration_max, client_scenario_text, NULL);
 
     /* Start the client connections */
