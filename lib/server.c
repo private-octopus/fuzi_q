@@ -93,7 +93,7 @@ int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, ui
         }
         else {
             fuzi_q_ctx.fuzz_mode = fuzz_mode;
-            basic_fuzzer_init(&fuzi_q_ctx.fuzz_ctx, duration_max);
+            fuzzer_init(&fuzi_q_ctx.fuzz_ctx, duration_max);
             picoquic_set_fuzz(fuzi_q_ctx.quic, basic_fuzzer, &fuzi_q_ctx.fuzz_ctx);
             picoquic_set_key_log_file_from_env(fuzi_q_ctx.quic);
 

@@ -91,9 +91,10 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
         else {
             ret = picoquic_demo_client_initialize_context(&cnx_ctx->callback_ctx, fuzi_q_ctx->client_sc, fuzi_q_ctx->client_sc_nb,
                 fuzi_q_ctx->config->alpn, 1, 0);
-            cnx_ctx->callback_ctx.out_dir = fuzi_q_ctx->config->out_dir;
-            cnx_ctx->callback_ctx.last_interaction_time = current_time;
             if (ret == 0) {
+                cnx_ctx->callback_ctx.out_dir = fuzi_q_ctx->config->out_dir;
+                cnx_ctx->callback_ctx.last_interaction_time = current_time;
+                cnx_ctx->callback_ctx.no_print = 1;
                 picoquic_set_callback(cnx_ctx->cnx_client, picoquic_demo_client_callback, &cnx_ctx->callback_ctx);
 
                 if (cnx_ctx->cnx_client->alpn == NULL) {
@@ -157,7 +158,7 @@ int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_c
 
     fuzi_q_ctx->fuzz_mode = fuzz_mode;
     fuzi_q_ctx->config = config;
-    fuzi_q_ctx->up_time_interval = 10000000; /* Use 10 seonds by default */
+    fuzi_q_ctx->up_time_interval = 60000000; /* Use 1 minute by default -- hanshake timer is set to 30 seconds. */
     if (config != NULL) {
         fuzi_q_ctx->socket_buffer_size = config->socket_buffer_size;
         fuzi_q_ctx->alpn = config->alpn;
@@ -206,7 +207,7 @@ int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_c
         }
         else {
             if (fuzz_mode != fuzi_q_mode_clean) {
-                basic_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+                fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
                 picoquic_set_fuzz(fuzi_q_ctx->quic, basic_fuzzer, &fuzi_q_ctx->fuzz_ctx);
             }
             picoquic_set_key_log_file_from_env(fuzi_q_ctx->quic);
@@ -297,6 +298,9 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
                     }
                 }
                 else if (cnx_ctx->callback_ctx.nb_open_streams == 0) {
+                    ret = picoquic_close(cnx_ctx->cnx_client, 0);
+                }
+                else if (cnx_state < picoquic_state_ready && cnx_ctx->cnx_client->start_time + 10000000 < current_time) {
                     ret = picoquic_close(cnx_ctx->cnx_client, 0);
                 }
             }
@@ -412,7 +416,9 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
 #endif
     }
 
-    fprintf(stdout, "Exit after %zu trials, server appears %s.\n", fuzi_q_ctx.nb_cnx_tried, (fuzi_q_ctx.server_is_down) ? "down" : "up");
+    fprintf(stdout, "Exit after %zu trials (initial:%u, random:%u), server appears %s.\n", fuzi_q_ctx.nb_cnx_tried,
+        fuzi_q_ctx.fuzz_ctx.nb_initial_fuzzed, fuzi_q_ctx.fuzz_ctx.nb_fuzzed,
+        (fuzi_q_ctx.server_is_down) ? "down" : "up");
 
     fuzi_q_release_client_context(&fuzi_q_ctx);
 
