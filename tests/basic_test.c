@@ -48,5 +48,5 @@ char const* fuzi_q_test_solution_dir = fuzi_q_DEFAULT_SOLUTION_DIR;
 /* Basic test, place holder for now. */
 int fuzi_q_basic_test()
 {
-    return 1;
+    return 0;
 }

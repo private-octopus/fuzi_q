@@ -31,6 +31,7 @@ extern "C" {
     extern char const* fuzi_q_test_solution_dir;
 
     int fuzi_q_basic_test();
+    int icid_table_test();
 
 #ifdef __cplusplus
 }

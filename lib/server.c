@@ -93,8 +93,8 @@ int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, ui
         }
         else {
             fuzi_q_ctx.fuzz_mode = fuzz_mode;
-            fuzzer_init(&fuzi_q_ctx.fuzz_ctx, duration_max);
-            picoquic_set_fuzz(fuzi_q_ctx.quic, basic_fuzzer, &fuzi_q_ctx.fuzz_ctx);
+            fuzi_q_fuzzer_init(&fuzi_q_ctx.fuzz_ctx, duration_max);
+            picoquic_set_fuzz(fuzi_q_ctx.quic, fuzi_q_fuzzer, &fuzi_q_ctx.fuzz_ctx);
             picoquic_set_key_log_file_from_env(fuzi_q_ctx.quic);
 
             picoquic_set_alpn_select_fn(fuzi_q_ctx.quic, picoquic_demo_server_callback_select_alpn);
@@ -139,6 +139,8 @@ int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, ui
 
     /* And exit */
     printf("Server exit, ret = 0x%x\n", ret);
+
+    fuzi_q_fuzzer_release(&fuzi_q_ctx.fuzz_ctx);
 
     if (fuzi_q_ctx.quic != NULL) {
         picoquic_free(fuzi_q_ctx.quic);

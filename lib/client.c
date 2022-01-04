@@ -65,13 +65,28 @@ void fuzi_q_release_connection(fuzi_q_cnx_ctx_t* cnx_ctx)
     memset(cnx_ctx, 0, sizeof(fuzi_q_cnx_ctx_t));
 }
 
+
+/* Create a random CID. This is useful for ensuring that the client tests are repeatable */
+void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
+{
+    uint64_t random_64 = picoquic_test_random(&ctx->random_context);
+    for (int i = 0; i < 8; i++) {
+        icid->id[i] = (uint8_t)(random_64 & 0xff);
+        random_64 >>= 8;
+    }
+    icid->id_len = 8;
+}
+
 /* Start client connection */
 int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx, uint64_t current_time)
 {
     /* Create the client connection, from parameters in fuzi_q context. */
     int ret = 0;
+    /* Create a predictable and random ICID */
+    picoquic_connection_id_t icid;
+    fuzzer_random_cid(&fuzi_q_ctx->fuzz_ctx, &icid);
     /* Create a client connection */
-    cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, picoquic_null_connection_id, picoquic_null_connection_id,
+    cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, icid, picoquic_null_connection_id,
         (struct sockaddr*)&fuzi_q_ctx->server_address, current_time,
         fuzi_q_ctx->config->proposed_version, fuzi_q_ctx->sni, fuzi_q_ctx->config->alpn, 1);
 
@@ -206,9 +221,9 @@ int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_c
             ret = -1;
         }
         else {
+            fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
             if (fuzz_mode != fuzi_q_mode_clean) {
-                fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
-                picoquic_set_fuzz(fuzi_q_ctx->quic, basic_fuzzer, &fuzi_q_ctx->fuzz_ctx);
+                picoquic_set_fuzz(fuzi_q_ctx->quic, fuzi_q_fuzzer, &fuzi_q_ctx->fuzz_ctx);
             }
             picoquic_set_key_log_file_from_env(fuzi_q_ctx->quic);
 

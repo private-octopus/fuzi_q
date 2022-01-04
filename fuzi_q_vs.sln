@@ -18,6 +18,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fuzi_qt", "fuzi_q_vs\fuzi_q
 		{6B876965-CD14-40F5-ADB6-1B245D178B68} = {6B876965-CD14-40F5-ADB6-1B245D178B68}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fuzi_q_vs_tests", "fuzi_q_tests\fuzi_q_tests.vcxproj", "{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A1E91F62-7924-441B-9AC9-57D147D7B1C0} = {A1E91F62-7924-441B-9AC9-57D147D7B1C0}
+		{6B876965-CD14-40F5-ADB6-1B245D178B68} = {6B876965-CD14-40F5-ADB6-1B245D178B68}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -58,6 +64,14 @@ Global
 		{9C683463-FB31-4C90-9415-D0F29FAA5765}.Release|x64.Build.0 = Release|x64
 		{9C683463-FB31-4C90-9415-D0F29FAA5765}.Release|x86.ActiveCfg = Release|Win32
 		{9C683463-FB31-4C90-9415-D0F29FAA5765}.Release|x86.Build.0 = Release|Win32
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Debug|x64.ActiveCfg = Debug|x64
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Debug|x64.Build.0 = Debug|x64
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Debug|x86.ActiveCfg = Debug|Win32
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Debug|x86.Build.0 = Debug|Win32
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Release|x64.ActiveCfg = Release|x64
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Release|x64.Build.0 = Release|x64
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Release|x86.ActiveCfg = Release|Win32
+		{AC4658C4-40CA-4B4E-8239-B2C36D3B3005}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

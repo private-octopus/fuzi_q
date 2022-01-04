@@ -44,11 +44,43 @@ typedef enum {
     fuzi_q_mode_clean
 } fuzi_q_mode_enum;
 
-/*
-* Fuzz test, merge of basic fuzzer and initial fuzzer from picoquic tests
-*/
+/* Fuzzing context per connection. The goals are:
+ * - Ensure fuzzing in all connection states, which implies specializing
+ *   some connections as for example "fuzzing the handhake" or "fuzzing
+ *   the closing state".
+ * - Allows for repeatability, which we obtain by using the initial connection
+ *   ID as seed for the fuzzing sequence.
+ * - Work well in either a "client" or "server" setup, which means making
+ *   no assumption on connection ID structure, apart from randomness, and
+ *   also implies using LRU management of the connection list.
+ * - Be reasonably fast, which is achieved by using a hash table for
+ *   accessing the contexts.
+ */
+
+typedef enum {
+    fuzzer_cnx_state_initial = 0,
+    fuzzer_cnx_state_handshake,
+    fuzzer_cnx_state_not_ready,
+    fuzzer_cnx_state_ready,
+    fuzzer_cnx_state_closing,
+    fuzzer_cnx_state_max
+} fuzzer_cnx_state_enum;
+
+typedef struct st_fuzzer_icid_ctx_t {
+    picosplay_node_t icid_node;
+    struct st_fuzzer_icid_ctx_t* icid_before;
+    struct st_fuzzer_icid_ctx_t* icid_after;
+    picoquic_connection_id_t icid;
+    uint64_t last_time;
+    uint64_t random_context;
+    picoquic_state_enum target_state;
+    int already_fuzzed;
+} fuzzer_icid_ctx_t;
 
 typedef struct st_fuzzer_ctx_t {
+    picosplay_tree_t icid_tree;
+    fuzzer_icid_ctx_t* icid_mru;
+    fuzzer_icid_ctx_t* icid_lru;
     uint32_t nb_packets;
     uint32_t nb_fuzzed;
     uint32_t nb_initial_fuzzed;
@@ -60,10 +92,28 @@ typedef struct st_fuzzer_ctx_t {
     int initial_fuzzing_done;
 } fuzzer_ctx_t;
 
-uint32_t basic_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
+fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid, uint64_t current_time);
+
+/* Test frames for use in fuzzing.
+ */
+typedef struct st_fuzi_q_frames_t {
+    char const* name;
+    uint8_t* val;
+    size_t len;
+} fuzi_q_frames_t;
+
+extern fuzi_q_frames_t fuzi_q_frame_list[];
+extern size_t nb_fuzi_q_frame_list;
+
+/*
+* Fuzz test, merge of basic fuzzer and initial fuzzer from picoquic tests
+*/
+
+uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length);
 
-void fuzzer_init(fuzzer_ctx_t* fuzz_ctx, uint64_t tweak);
+void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, uint64_t tweak);
+void fuzi_q_fuzzer_release(fuzzer_ctx_t* fuzz_ctx);
 
 /* Unification of initial and basic fuzzer
  * TODO: merge the two mechanisms in a single state

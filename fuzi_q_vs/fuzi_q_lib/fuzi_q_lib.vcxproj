@@ -144,7 +144,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\lib\client.c" />
+    <ClCompile Include="..\..\lib\context.c" />
     <ClCompile Include="..\..\lib\fuzzer.c" />
+    <ClCompile Include="..\..\lib\fuzzer_frames.c" />
     <ClCompile Include="..\..\lib\server.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

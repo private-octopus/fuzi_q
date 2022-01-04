@@ -14,6 +14,7 @@ endif()
 
 set(FUZI_QLIBRARY_FILES
     lib/fuzzer.c
+    lib/fuzzer_frames.c
     lib/client.c
     lib/server.c
 )
