@@ -111,16 +111,13 @@ fuzzer_cnx_state_enum fuzzer_get_cnx_state(picoquic_cnx_t* cnx)
     fuzzer_cnx_state_enum fuzz_cnx_state = fuzzer_cnx_state_initial;
 
     if (cnx_state == picoquic_state_ready) {
-        fuzz_cnx_state = fuzzer_cnx_state_not_ready;
+        fuzz_cnx_state = fuzzer_cnx_state_ready;
     }
     else if (cnx_state > picoquic_state_ready) {
         fuzz_cnx_state = fuzzer_cnx_state_closing;
     }
     else if (cnx_state >= picoquic_state_client_almost_ready) {
         fuzz_cnx_state = fuzzer_cnx_state_not_ready;
-    }
-    else if (cnx_state >= picoquic_state_server_handshake) {
-        fuzz_cnx_state = fuzzer_cnx_state_handshake;
     }
     return fuzz_cnx_state;
 }
@@ -138,10 +135,15 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint32_t fuzz_index = 0;
     fuzzer_cnx_state_enum fuzz_cnx_state = fuzzer_get_cnx_state(cnx);
     uint32_t fuzzed_length = (uint32_t)length;
-    int fuzz_again = ((fuzz_pilot & 0xf) == 0);
+    int fuzz_again = ((fuzz_pilot & 0xf) <= 7);
+
+    if (fuzz_cnx_state < 0 || fuzz_cnx_state > fuzzer_cnx_state_max) {
+        fuzz_cnx_state = fuzzer_cnx_state_closing;
+    }
 
     fuzz_pilot >>= 4;
     ctx->nb_packets++;
+    ctx->nb_packets_state[fuzz_cnx_state] += 1;
 
     /* Only perform fuzzing if the connection has reached or passed the target state */
     if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
@@ -200,7 +202,12 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
                 memset(&bytes[header_length + len], 0, length - (header_length + len));
             }
         }
-        icid_ctx->already_fuzzed = 1;
+        if (icid_ctx->already_fuzzed == 0) {
+            icid_ctx->already_fuzzed = 1;
+            ctx->nb_cnx_tried[icid_ctx->target_state] += 1;
+            ctx->nb_cnx_fuzzed[fuzz_cnx_state] += 1;
+        }
+        ctx->nb_packets_fuzzed[fuzz_cnx_state] += 1;
     }
 
     return fuzzed_length;

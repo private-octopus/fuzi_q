@@ -97,7 +97,8 @@ static fuzzer_icid_ctx_t* create_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection
         (void)picoquic_parse_connection_id(icid->id, icid->id_len, &icid_ctx->icid);
         icid_ctx->random_context = picoquic_connection_id_hash(icid);
         /* Set the initial values, e.g. target state */
-        icid_ctx->target_state = (icid_ctx->random_context ^ 0xdeadbeefc001cafeull) % fuzzer_cnx_state_max;
+        uint64_t random_state = (icid_ctx->random_context ^ 0xdeadbeefc001cafeull) % fuzzer_cnx_state_max;
+        icid_ctx->target_state = (fuzzer_cnx_state_enum)random_state;
         if (ctx->icid_mru != NULL) {
             ctx->icid_mru->icid_before = icid_ctx;
         }

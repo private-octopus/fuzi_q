@@ -59,7 +59,6 @@ typedef enum {
 
 typedef enum {
     fuzzer_cnx_state_initial = 0,
-    fuzzer_cnx_state_handshake,
     fuzzer_cnx_state_not_ready,
     fuzzer_cnx_state_ready,
     fuzzer_cnx_state_closing,
@@ -73,7 +72,7 @@ typedef struct st_fuzzer_icid_ctx_t {
     picoquic_connection_id_t icid;
     uint64_t last_time;
     uint64_t random_context;
-    picoquic_state_enum target_state;
+    fuzzer_cnx_state_enum target_state;
     int already_fuzzed;
 } fuzzer_icid_ctx_t;
 
@@ -81,15 +80,14 @@ typedef struct st_fuzzer_ctx_t {
     picosplay_tree_t icid_tree;
     fuzzer_icid_ctx_t* icid_mru;
     fuzzer_icid_ctx_t* icid_lru;
+    uint64_t random_context;
+    size_t nb_cnx_tried[fuzzer_cnx_state_max];
+    size_t nb_cnx_fuzzed[fuzzer_cnx_state_max];
+    size_t nb_packets_fuzzed[fuzzer_cnx_state_max];
+    size_t nb_packets_state[fuzzer_cnx_state_max];
     uint32_t nb_packets;
     uint32_t nb_fuzzed;
-    uint32_t nb_initial_fuzzed;
     uint32_t nb_fuzzed_length;
-    uint64_t random_context;
-    picoquic_state_enum highest_state_fuzzed;
-    uint32_t current_frame;
-    uint32_t fuzz_position;
-    int initial_fuzzing_done;
 } fuzzer_ctx_t;
 
 fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid, uint64_t current_time);
@@ -152,6 +150,8 @@ typedef struct st_fuzi_q_ctx_t {
     uint32_t desired_version;
     int is_quicperf;
     int server_is_down;
+    uint64_t cnx_duration_min;
+    uint64_t cnx_duration_max;
     /* Management of fuzzing. */
     fuzzer_ctx_t fuzz_ctx;
 } fuzi_q_ctx_t;
