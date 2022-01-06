@@ -77,16 +77,27 @@ void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
     icid->id_len = 8;
 }
 
+/* Mark connection active */
+void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time)
+{
+    for (size_t i = 0; i < fuzi_q_ctx->nb_cnx_ctx; i++) {
+        if (fuzi_q_ctx->cnx_ctx[i].cnx_client != NULL &&
+            picoquic_compare_connection_id(icid, &fuzi_q_ctx->cnx_ctx[i].icid) == 0) {
+            fuzi_q_ctx->cnx_ctx[i].next_time = current_time + FUZI_Q_MAX_SILENCE;
+            break;
+        }
+    }
+}
+
 /* Start client connection */
 int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx, uint64_t current_time)
 {
     /* Create the client connection, from parameters in fuzi_q context. */
     int ret = 0;
     /* Create a predictable and random ICID */
-    picoquic_connection_id_t icid;
-    fuzzer_random_cid(&fuzi_q_ctx->fuzz_ctx, &icid);
+    fuzzer_random_cid(&fuzi_q_ctx->fuzz_ctx, &cnx_ctx->icid);
     /* Create a client connection */
-    cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, icid, picoquic_null_connection_id,
+    cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, cnx_ctx->icid, picoquic_null_connection_id,
         (struct sockaddr*)&fuzi_q_ctx->server_address, current_time,
         fuzi_q_ctx->config->proposed_version, fuzi_q_ctx->sni, fuzi_q_ctx->config->alpn, 1);
 
@@ -144,6 +155,7 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
         }
 
         if (ret == 0) {
+            cnx_ctx->next_time = current_time + FUZI_Q_MAX_SILENCE;
             ret = picoquic_start_client_cnx(cnx_ctx->cnx_client);
         }
         if (ret == 0 && !fuzi_q_ctx->is_quicperf) {
@@ -223,6 +235,7 @@ int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_c
         }
         else {
             fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+            fuzi_q_ctx->fuzz_ctx.parent = fuzi_q_ctx;
             if (fuzz_mode != fuzi_q_mode_clean) {
                 picoquic_set_fuzz(fuzi_q_ctx->quic, fuzi_q_fuzzer, &fuzi_q_ctx->fuzz_ctx);
             }
@@ -318,14 +331,16 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
                 else if (cnx_ctx->callback_ctx.nb_open_streams == 0) {
                     ret = picoquic_close(cnx_ctx->cnx_client, 0);
                 }
-                else if (cnx_ctx->cnx_client->path[0]->nb_retransmit > 2) {
-                    should_abandon = 1;
-                }
+            }
+            if (cnx_ctx->cnx_client->path[0]->nb_retransmit > 2 || current_time >= cnx_ctx->next_time) {
+                should_abandon = 1;
             }
             if (cnx_state == picoquic_state_disconnected || should_abandon) {
                 uint64_t cnx_duration = current_time - cnx_ctx->cnx_client->start_time;
                 if (cnx_duration > fuzi_q_ctx->cnx_duration_max) {
                     fuzi_q_ctx->cnx_duration_max = cnx_duration;
+                    fuzi_q_ctx->icid_duration_max.id_len = picoquic_parse_connection_id(cnx_ctx->cnx_client->initial_cnxid.id,
+                        cnx_ctx->cnx_client->initial_cnxid.id_len, &fuzi_q_ctx->icid_duration_max);
                 }
                 if (cnx_duration < fuzi_q_ctx->cnx_duration_min) {
                     fuzi_q_ctx->cnx_duration_min = cnx_duration;
@@ -359,10 +374,18 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
 
 void fuzi_q_check_time(fuzi_q_ctx_t* fuzi_q_ctx, packet_loop_time_check_arg_t* time_check_arg)
 {
-
     uint64_t next_time = time_check_arg->current_time + time_check_arg->delta_t;
     uint64_t next_event_time = (fuzi_q_ctx->next_success_time < fuzi_q_ctx->end_of_time) ?
         fuzi_q_ctx->next_success_time : fuzi_q_ctx->end_of_time;
+
+    if (fuzi_q_ctx->fuzz_mode == fuzi_q_mode_client) {
+        for (size_t i = 0; i < fuzi_q_ctx->nb_cnx_ctx; i++) {
+            if (fuzi_q_ctx->cnx_ctx[i].cnx_client != NULL &&
+                fuzi_q_ctx->cnx_ctx[i].next_time < next_event_time) {
+                next_event_time = fuzi_q_ctx->cnx_ctx[i].next_time;
+            }
+        }
+    }
 
     if (next_event_time < next_time) {
         time_check_arg->delta_t = next_time - time_check_arg->current_time;
@@ -453,6 +476,11 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
         fuzi_q_ctx.nb_cnx_tried, fuzi_q_ctx.nb_cnx_required,
         ((double)fuzi_q_ctx.cnx_duration_min) / 1000000.0,
         ((double)fuzi_q_ctx.cnx_duration_max) / 1000000.0);
+    fprintf(stdout, "ID of longest_connection: ");
+    for (uint8_t x = 0; x < fuzi_q_ctx.icid_duration_max.id_len; x++) {
+        fprintf(stdout, "%02x", fuzi_q_ctx.icid_duration_max.id[x]);
+    }
+    fprintf(stdout, "\n");
 
     fuzi_q_release_client_context(&fuzi_q_ctx);
 

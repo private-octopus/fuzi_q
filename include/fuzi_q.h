@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+#define FUZI_Q_MAX_SILENCE 3000000
+
 /* Operation modes for the fuzzer
  */
 typedef enum {
@@ -80,6 +82,7 @@ typedef struct st_fuzzer_ctx_t {
     picosplay_tree_t icid_tree;
     fuzzer_icid_ctx_t* icid_mru;
     fuzzer_icid_ctx_t* icid_lru;
+    struct st_fuzi_q_ctx_t* parent;
     uint64_t random_context;
     size_t nb_cnx_tried[fuzzer_cnx_state_max];
     size_t nb_cnx_fuzzed[fuzzer_cnx_state_max];
@@ -120,8 +123,10 @@ void fuzi_q_fuzzer_release(fuzzer_ctx_t* fuzz_ctx);
 typedef struct st_fuzi_q_cnx_ctx_t {
     /* Data required to start client connections */
     picoquic_cnx_t* cnx_client;
+    picoquic_connection_id_t icid;
     picoquic_demo_callback_ctx_t callback_ctx;
     quicperf_ctx_t* quicperf_ctx;
+    uint64_t next_time;
     int zero_rtt_available;
     int success_observed;
 } fuzi_q_cnx_ctx_t;
@@ -152,6 +157,7 @@ typedef struct st_fuzi_q_ctx_t {
     int server_is_down;
     uint64_t cnx_duration_min;
     uint64_t cnx_duration_max;
+    picoquic_connection_id_t icid_duration_max;
     /* Management of fuzzing. */
     fuzzer_ctx_t fuzz_ctx;
 } fuzi_q_ctx_t;
@@ -160,6 +166,7 @@ int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, ui
 int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
     char const* client_scenario_text);
+void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time);
 
 #ifdef __cplusplus
 }

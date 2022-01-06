@@ -73,6 +73,51 @@ uint32_t basic_packet_fuzzer(fuzzer_ctx_t* ctx, uint64_t fuzz_pilot,
     return (uint32_t)length;
 }
 
+#define FUZZER_MAX_NB_FRAMES 32
+
+int frame_header_fuzzer(uint64_t fuzz_pilot,
+    uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length)
+{
+    uint8_t* frame_head[FUZZER_MAX_NB_FRAMES];
+    size_t frame_length[FUZZER_MAX_NB_FRAMES];
+    uint8_t* last_byte = bytes + bytes_max;
+    size_t nb_frames = 0;
+    int was_fuzzed = 0;
+
+    bytes += header_length;
+
+    while (bytes != NULL && bytes < last_byte && nb_frames < FUZZER_MAX_NB_FRAMES) {
+        size_t consumed = 0;
+        int is_pure_ack = 1;
+        uint8_t first_byte = *bytes;
+        frame_head[nb_frames] = bytes;
+        if (picoquic_skip_frame(bytes, last_byte - bytes, &consumed, &is_pure_ack) == 0) {
+            bytes += consumed;
+            frame_length[nb_frames] = consumed;
+            nb_frames++;
+        }
+        else {
+            bytes = NULL;
+        }
+    }
+
+    if (nb_frames > 0) {
+        size_t fuzzed_frame = (size_t)(fuzz_pilot % nb_frames);
+        uint8_t* frame_byte = frame_head[fuzzed_frame];
+        size_t fuzz_max = (frame_length[fuzzed_frame] > 9) ? 9 : frame_length[fuzzed_frame];
+        size_t fuzz_index = (fuzz_max > 1) ? (size_t)((fuzz_pilot >> 5) % (fuzz_max - 1)) + 1 : 0;
+        fuzz_pilot >>= 8;
+        while (fuzz_pilot != 0 && fuzz_index < fuzz_max) {
+            /* flip one byte */
+            frame_byte[fuzz_index++] = (uint8_t)(fuzz_pilot & 0xFF);
+            fuzz_pilot >>= 8;
+            was_fuzzed = 1;
+        }
+    }
+
+    return was_fuzzed;
+}
+
 size_t length_non_padded(uint8_t* bytes, size_t length, size_t header_length)
 {
     uint8_t* bytes_begin = bytes;
@@ -128,7 +173,8 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     /* Get the global fuzzing context */
     fuzzer_ctx_t* ctx = (fuzzer_ctx_t*)fuzz_ctx;
     /* Get the fuzzing context for this CID */
-    fuzzer_icid_ctx_t* icid_ctx = fuzzer_get_icid_ctx(ctx, &cnx->initial_cnxid, picoquic_get_quic_time(cnx->quic));
+    uint64_t current_time = picoquic_get_quic_time(cnx->quic);
+    fuzzer_icid_ctx_t* icid_ctx = fuzzer_get_icid_ctx(ctx, &cnx->initial_cnxid, current_time);
     uint64_t fuzz_pilot = picoquic_test_random(&icid_ctx->random_context);
     int should_fuzz = 0;
     int should_fuzz_initial = 0;
@@ -142,72 +188,81 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     }
 
     fuzz_pilot >>= 4;
-    ctx->nb_packets++;
-    ctx->nb_packets_state[fuzz_cnx_state] += 1;
 
-    /* Only perform fuzzing if the connection has reached or passed the target state */
-    if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
-        /* TODO: remember how often that state was fuzzed, and then maybe
-         * wait for the next packet, so as not always fuzz the first
-         * packet in the state. However, don't do that for closing
-         * state, as there will only be one packet there */
-        /* Based on the fuzz pilot, pick one of the following */
-        uint64_t next_step = fuzz_pilot & 0x03;
-        size_t final_pad = length_non_padded(bytes, length, header_length);
-        size_t fuzz_frame_id = (size_t)((fuzz_pilot >> 2) % nb_fuzi_q_frame_list);
-        size_t len = fuzi_q_frame_list[fuzz_frame_id].len;
-        int was_fuzzed = 0;
+    if (icid_ctx != NULL) {
+        ctx->nb_packets++;
+        ctx->nb_packets_state[fuzz_cnx_state] += 1;
+        /* Only perform fuzzing if the connection has reached or passed the target state */
+        if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
+             /* Based on the fuzz pilot, pick one of the following */
+            uint64_t next_step = fuzz_pilot & 0x03;
+            size_t final_pad = length_non_padded(bytes, length, header_length);
+            size_t fuzz_frame_id = (size_t)((fuzz_pilot >> 3) % nb_fuzi_q_frame_list);
+            size_t len = fuzi_q_frame_list[fuzz_frame_id].len;
+            int fuzz_more = ((fuzz_pilot >> 8) & 1) > 0;
+            int was_fuzzed = 0;
+            fuzz_pilot >>= 9;
 
-        switch (next_step) {
-        case 0:
-            if (final_pad + len <= bytes_max) {
-                /* First test variant: add a random frame at the end of the packet */
-                memcpy(&bytes[final_pad], fuzi_q_frame_list[fuzz_frame_id].val, len);
-                final_pad += len;
-                was_fuzzed++;
+            switch (next_step) {
+            case 0:
+                if (final_pad + len <= bytes_max) {
+                    /* First test variant: add a random frame at the end of the packet */
+                    memcpy(&bytes[final_pad], fuzi_q_frame_list[fuzz_frame_id].val, len);
+                    final_pad += len;
+                    was_fuzzed++;
+                }
+                break;
+            case 1:
+                if (final_pad + len <= bytes_max) {
+                    /* Second test variant: add a random frame at the beginning of the packet */
+                    memmove(bytes + header_length + len, bytes + header_length, final_pad);
+                    memcpy(&bytes[header_length], fuzi_q_frame_list[fuzz_frame_id].val, len);
+                    final_pad += len;
+                    was_fuzzed++;
+                }
+                break;
+            case 2:
+                if (header_length + len <= bytes_max) {
+                    /* Third test variant: replace the packet by a random frame */
+                    memcpy(&bytes[header_length], fuzi_q_frame_list[fuzz_frame_id].val, len);
+                    was_fuzzed++;
+                    final_pad = header_length + len;
+                }
+                break;
+            default:
+                len = 0;
+                break;
             }
-            break;
-        case 1:
-            if (final_pad + len <= bytes_max) {
-                /* Second test variant: add a random frame at the beginning of the packet */
-                memmove(bytes + header_length + len, bytes + header_length, final_pad);
-                memcpy(&bytes[header_length], fuzi_q_frame_list[fuzz_frame_id].val, len);
-                final_pad += len;
-                was_fuzzed++;
-            }
-            break;
-        case 2:
-            if (header_length + len <= bytes_max) {
-                /* Third test variant: replace the packet by a random frame */
-                memcpy(&bytes[header_length], fuzi_q_frame_list[fuzz_frame_id].val, len);
-                was_fuzzed++;
-                final_pad = header_length + len;
-            }
-            break;
-        default:
-            break;
-        }
-        /* TODO: based on the fuzz pilot, consider padding multiple frames */
-        /* TODO: based on the fuzz pilot, consider fuzzing padded frames */
+            /* TODO: based on the fuzz pilot, consider padding multiple frames */
 
-        if (!was_fuzzed) {
-            fuzzed_length = basic_packet_fuzzer(ctx, fuzz_pilot, bytes, bytes_max, length, header_length);
-        }
-        else {
             if (final_pad > length) {
-                fuzzed_length = (uint32_t) final_pad;
+                fuzzed_length = (uint32_t)final_pad;
             }
             else {
                 /* If there is room left, pad. */
                 memset(&bytes[header_length + len], 0, length - (header_length + len));
             }
+
+            if (!was_fuzzed || fuzz_more) {
+                was_fuzzed |= frame_header_fuzzer(fuzz_pilot, bytes, bytes_max, final_pad, header_length);
+                if (!was_fuzzed) {
+                    fuzzed_length = basic_packet_fuzzer(ctx, fuzz_pilot, bytes, bytes_max, length, header_length);
+                }
+            }
+
+            if (icid_ctx->already_fuzzed == 0) {
+                icid_ctx->already_fuzzed = 1;
+                ctx->nb_cnx_tried[icid_ctx->target_state] += 1;
+                ctx->nb_cnx_fuzzed[fuzz_cnx_state] += 1;
+            }
+            ctx->nb_packets_fuzzed[fuzz_cnx_state] += 1;
         }
-        if (icid_ctx->already_fuzzed == 0) {
-            icid_ctx->already_fuzzed = 1;
-            ctx->nb_cnx_tried[icid_ctx->target_state] += 1;
-            ctx->nb_cnx_fuzzed[fuzz_cnx_state] += 1;
+
+        /* Mark the connection as active */
+        if (ctx->parent != NULL) {
+            /* Mark active */
+            fuzi_q_mark_active(ctx->parent, &icid_ctx->icid, current_time);
         }
-        ctx->nb_packets_fuzzed[fuzz_cnx_state] += 1;
     }
 
     return fuzzed_length;
