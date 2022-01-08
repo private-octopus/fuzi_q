@@ -12,7 +12,7 @@ if(DISABLE_DEBUG_PRINTF)
     set(CMAKE_C_FLAGS "-DDISABLE_DEBUG_PRINTF ${CMAKE_C_FLAGS}")
 endif()
 
-set(FUZI_QLIBRARY_FILES
+set(FUZI_Q_LIBRARY_FILES
     lib/fuzzer.c
     lib/fuzzer_frames.c
     lib/client.c
@@ -45,7 +45,7 @@ include_directories(include lib tests
     ${Picoquic_INCLUDE_DIRS} ${PTLS_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
 add_library(fuzy_q-core
-    ${FUZI_QLIBRARY_FILES}
+    ${FUZI_Q_LIBRARY_FILES}
 )
 
 add_library(fuzi_q-tests

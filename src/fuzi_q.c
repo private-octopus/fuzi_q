@@ -88,7 +88,6 @@ int main(int argc, char** argv)
     fuzi_q_mode_enum fuzz_mode = 0;
     const char* server_name = NULL;
     int server_port = -1;
-    size_t nb_cnx_ctx = 1;
     size_t nb_fuzz_trials = 0;
     uint64_t fuzz_duration_max = 0;
     int arg_as_int;
