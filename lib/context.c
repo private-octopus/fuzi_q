@@ -146,6 +146,10 @@ fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id
         }
     }
 
+    while (ctx->icid_lru != NULL && ctx->icid_lru->last_time + 2 * FUZI_Q_MAX_SILENCE < current_time) {
+        remove_last_icid_from_list(ctx);
+    }
+
     return icid_ctx;
 }
 

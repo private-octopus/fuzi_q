@@ -196,13 +196,6 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     if (icid_ctx != NULL) {
         ctx->nb_packets++;
         ctx->nb_packets_state[fuzz_cnx_state] += 1;
-#if 1
-        if (fuzz_cnx_state == fuzzer_cnx_state_initial &&
-            icid_ctx->target_state != fuzzer_cnx_state_initial)
-        {
-            DBG_PRINTF("%s", "Bug");
-        }
-#endif
         /* Only perform fuzzing if the connection has reached or passed the target state */
         if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
              /* Based on the fuzz pilot, pick one of the following */

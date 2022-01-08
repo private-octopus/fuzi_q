@@ -482,7 +482,7 @@ int fuzi_q_set_test_server_ctx(fuzi_q_test_config_t* test_config, fuzi_q_ctx_t* 
 {
     int ret = 0;
     picoquic_quic_config_t config = { 0 };
-    config.nb_connections = (uint32_t)(2*nb_cnx_ctx);
+    config.nb_connections = (uint32_t)(4*nb_cnx_ctx);
     config.server_cert_file = test_config->test_server_cert_file;
     config.server_key_file = test_config->test_server_key_file;
     config.cnx_id_length = 8;
@@ -646,7 +646,7 @@ int fuzi_q_basic_test_loop(int fuzz_client, int fuzz_server, int simulate_loss)
             DBG_PRINTF("Tried %zu connections instead of %zu" PRIu64, fuzi_q_ctx->nb_cnx_tried, nb_cnx_required);
             ret = -1;
         }
-        else {
+        else if (client_fuzz_mode == fuzi_q_mode_client) {
             ret = fuzi_q_test_check_fuzz(nb_cnx_required, &fuzi_q_ctx->fuzz_ctx);
         }
     }

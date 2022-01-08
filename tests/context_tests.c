@@ -105,7 +105,7 @@ int icid_table_test()
     {
         /* Create once, then check again, and verify that all entries are in the table in the right order */
         for (size_t i = 0; i < nb_test_icid; i++) {
-            current_time += 1000000;
+            current_time += 1000;
             (void)fuzzer_get_icid_ctx(&ctx, &test_icid[i], current_time);
             if (ret == 0) {
                 ret = icid_table_check_chain(&ctx, ctx.icid_tree.size);
