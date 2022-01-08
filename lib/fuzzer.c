@@ -33,7 +33,6 @@
 uint32_t basic_packet_fuzzer(fuzzer_ctx_t* ctx, uint64_t fuzz_pilot,
     uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length)
 {
-    int should_fuzz = 0;
     uint32_t fuzz_index = 0;
 
     /* Once in 64, fuzz by changing the length */
@@ -93,7 +92,6 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
     while (bytes != NULL && bytes < last_byte && nb_frames < FUZZER_MAX_NB_FRAMES) {
         size_t consumed = 0;
         int is_pure_ack = 1;
-        uint8_t first_byte = *bytes;
         frame_head[nb_frames] = bytes;
         if (picoquic_skip_frame(bytes, last_byte - bytes, &consumed, &is_pure_ack) == 0) {
             bytes += consumed;
@@ -180,9 +178,6 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint64_t current_time = picoquic_get_quic_time(cnx->quic);
     fuzzer_icid_ctx_t* icid_ctx = fuzzer_get_icid_ctx(ctx, &cnx->initial_cnxid, current_time);
     uint64_t fuzz_pilot = picoquic_test_random(&icid_ctx->random_context);
-    int should_fuzz = 0;
-    int should_fuzz_initial = 0;
-    uint32_t fuzz_index = 0;
     fuzzer_cnx_state_enum fuzz_cnx_state = fuzzer_get_cnx_state(cnx);
     uint32_t fuzzed_length = (uint32_t)length;
     int fuzz_again = ((fuzz_pilot & 0xf) <= 7);
