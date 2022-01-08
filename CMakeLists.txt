@@ -27,7 +27,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Picoquic REQUIRED)
 message(STATUS "Picoquic/include: ${Picoquic_INCLUDE_DIRS}" )
-message(STATUS "Picoquic library: ${Picoquic_LIBRARIES}" )
+message(STATUS "Picohttp library: ${Picoquic_LIBRARIES}" )
 
 find_package(PTLS REQUIRED)
 message(STATUS "picotls/include: ${PTLS_INCLUDE_DIRS}" )
