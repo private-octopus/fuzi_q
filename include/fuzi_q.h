@@ -43,7 +43,8 @@ typedef enum {
     fuzi_q_mode_none = 0,
     fuzi_q_mode_server,
     fuzi_q_mode_client,
-    fuzi_q_mode_clean
+    fuzi_q_mode_clean,
+    fuzi_q_mode_clean_server
 } fuzi_q_mode_enum;
 
 /* Fuzzing context per connection. The goals are:
@@ -129,6 +130,7 @@ typedef struct st_fuzi_q_cnx_ctx_t {
     uint64_t next_time;
     int zero_rtt_available;
     int success_observed;
+    int was_fuzzed;
 } fuzi_q_cnx_ctx_t;
 
 typedef struct st_fuzi_q_ctx_t {
@@ -139,6 +141,7 @@ typedef struct st_fuzi_q_ctx_t {
     const char* sni;
     const char* alpn;
     size_t socket_buffer_size;
+    char const* out_dir;
     /* Data required to start client connections */
     struct sockaddr_storage server_address;
     char const* client_scenario_text;
@@ -166,7 +169,10 @@ int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, ui
 int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
     char const* client_scenario_text);
-void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time);
+void fuzi_q_release_client_context(fuzi_q_ctx_t* fuzi_q_ctx);
+void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time, int was_fuzzed);
+uint64_t fuzi_q_next_time(fuzi_q_ctx_t* fuzi_q_ctx);
+int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time, int * is_active);
 
 #ifdef __cplusplus
 }

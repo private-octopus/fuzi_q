@@ -146,6 +146,10 @@
     <ClCompile Include="..\..\tests\basic_test.c" />
     <ClCompile Include="..\..\tests\context_tests.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\fuzi_q.h" />
+    <ClInclude Include="..\..\tests\fuzi_q_tests.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

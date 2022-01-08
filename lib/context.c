@@ -51,15 +51,17 @@ static void fuzi_q_icid_list_remove(fuzzer_ctx_t* ctx, fuzzer_icid_ctx_t* icid_c
         ctx->icid_lru = icid_ctx->icid_before;
     }
     else {
-        icid_ctx->icid_after = icid_ctx->icid_before;
+        icid_ctx->icid_after->icid_before = icid_ctx->icid_before;
     }
-
     if (icid_ctx->icid_before == NULL) {
         ctx->icid_mru = icid_ctx->icid_after;
     }
     else {
-        icid_ctx->icid_before = icid_ctx->icid_after;
+        icid_ctx->icid_before->icid_after = icid_ctx->icid_after;
     }
+
+    icid_ctx->icid_after = NULL;
+    icid_ctx->icid_before = NULL;
 }
 
 static void fuzi_q_icid_list_delete_node(void* tree, picosplay_node_t* node)
@@ -101,9 +103,9 @@ static fuzzer_icid_ctx_t* create_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection
         icid_ctx->target_state = (fuzzer_cnx_state_enum)random_state;
         if (ctx->icid_mru != NULL) {
             ctx->icid_mru->icid_before = icid_ctx;
+            icid_ctx->icid_after = ctx->icid_mru;
         }
         ctx->icid_mru = icid_ctx;
-        icid_ctx->icid_after = ctx->icid_mru;
         
         if (ctx->icid_lru == NULL) {
             ctx->icid_lru = icid_ctx;
@@ -130,7 +132,7 @@ fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id
 
     if (icid_ctx != NULL) {
         icid_ctx->last_time = current_time;
-        if (icid_ctx->icid_before != ctx->icid_mru) {
+        if (icid_ctx != ctx->icid_mru) {
             fuzi_q_icid_list_remove(ctx, icid_ctx);
             icid_ctx->icid_after = ctx->icid_mru;
             icid_ctx->icid_before = NULL;
@@ -138,6 +140,9 @@ fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id
                 ctx->icid_mru->icid_before = icid_ctx;
             }
             ctx->icid_mru = icid_ctx;
+            if (ctx->icid_lru == NULL) {
+                ctx->icid_lru = icid_ctx;
+            }
         }
     }
 

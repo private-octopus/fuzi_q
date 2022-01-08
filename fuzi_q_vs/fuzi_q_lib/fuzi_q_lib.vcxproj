@@ -149,6 +149,9 @@
     <ClCompile Include="..\..\lib\fuzzer_frames.c" />
     <ClCompile Include="..\..\lib\server.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\fuzi_q.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

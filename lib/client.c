@@ -78,12 +78,13 @@ void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
 }
 
 /* Mark connection active */
-void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time)
+void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time, int was_fuzzed)
 {
     for (size_t i = 0; i < fuzi_q_ctx->nb_cnx_ctx; i++) {
         if (fuzi_q_ctx->cnx_ctx[i].cnx_client != NULL &&
             picoquic_compare_connection_id(icid, &fuzi_q_ctx->cnx_ctx[i].icid) == 0) {
             fuzi_q_ctx->cnx_ctx[i].next_time = current_time + FUZI_Q_MAX_SILENCE;
+            fuzi_q_ctx->cnx_ctx[i].was_fuzzed |= was_fuzzed;
             break;
         }
     }
@@ -99,7 +100,7 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
     /* Create a client connection */
     cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, cnx_ctx->icid, picoquic_null_connection_id,
         (struct sockaddr*)&fuzi_q_ctx->server_address, current_time,
-        fuzi_q_ctx->config->proposed_version, fuzi_q_ctx->sni, fuzi_q_ctx->config->alpn, 1);
+        0, PICOQUIC_TEST_SNI, NULL, 1);
 
     if (cnx_ctx->cnx_client == NULL) {
         ret = -1;
@@ -116,9 +117,9 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
         }
         else {
             ret = picoquic_demo_client_initialize_context(&cnx_ctx->callback_ctx, fuzi_q_ctx->client_sc, fuzi_q_ctx->client_sc_nb,
-                fuzi_q_ctx->config->alpn, 1, 0);
+                NULL, 1, 0);
             if (ret == 0) {
-                cnx_ctx->callback_ctx.out_dir = fuzi_q_ctx->config->out_dir;
+                cnx_ctx->callback_ctx.out_dir = fuzi_q_ctx->out_dir;
                 cnx_ctx->callback_ctx.last_interaction_time = current_time;
                 cnx_ctx->callback_ctx.no_print = 1;
                 picoquic_set_callback(cnx_ctx->cnx_client, picoquic_demo_client_callback, &cnx_ctx->callback_ctx);
@@ -302,7 +303,7 @@ void fuzi_q_release_client_context(fuzi_q_ctx_t* fuzi_q_ctx)
  * has succeeded for at least some connections. 
  * TODO: consider migration trials, key update trials.
  */
-int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
+int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time, int * is_active)
 {
     int ret = 0;
     int nb_active = 0;
@@ -325,11 +326,13 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
                         if (!fuzi_q_ctx->is_quicperf) {
                             /* Start the download scenario */
                             ret = picoquic_demo_client_start_streams(cnx_ctx->cnx_client, &cnx_ctx->callback_ctx, PICOQUIC_DEMO_STREAM_ID_INITIAL);
+                            *is_active = 1;
                         }
                     }
                 }
                 else if (cnx_ctx->callback_ctx.nb_open_streams == 0) {
                     ret = picoquic_close(cnx_ctx->cnx_client, 0);
+                    *is_active = 1;
                 }
             }
             if (cnx_ctx->cnx_client->path[0]->nb_retransmit > 2 || current_time >= cnx_ctx->next_time) {
@@ -345,14 +348,21 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
                 if (cnx_duration < fuzi_q_ctx->cnx_duration_min) {
                     fuzi_q_ctx->cnx_duration_min = cnx_duration;
                 }
+                if (fuzi_q_ctx->fuzz_mode == fuzi_q_mode_client && !cnx_ctx->was_fuzzed) {
+                    DBG_PRINTF("Connection stopped without being fuzzed: %02x%02x...", cnx_ctx->icid.id[0], cnx_ctx->icid.id[1]);
+                }
                 fuzi_q_release_connection(cnx_ctx);
+                *is_active = 1;
             }
         }
         if (cnx_ctx->cnx_client == NULL){
-            if (current_time < fuzi_q_ctx->end_of_time && fuzi_q_ctx->nb_cnx_tried <  fuzi_q_ctx->nb_cnx_required) {
+            if (current_time >= fuzi_q_ctx->end_of_time) {
+                DBG_PRINTF("Abandon fuzz at time = %" PRIu64, current_time);
+            } else if (fuzi_q_ctx->nb_cnx_tried < fuzi_q_ctx->nb_cnx_required) {
                 /* If the required number of trials is not done, try starting a new connection. */
                 fuzi_q_ctx->nb_cnx_tried++;
                 ret = fuzi_q_start_connection(fuzi_q_ctx, cnx_ctx, current_time);
+                *is_active = 1;
                 nb_active++;
             }
         }
@@ -372,13 +382,15 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time)
     return ret;
 }
 
-void fuzi_q_check_time(fuzi_q_ctx_t* fuzi_q_ctx, packet_loop_time_check_arg_t* time_check_arg)
+uint64_t fuzi_q_next_time(fuzi_q_ctx_t* fuzi_q_ctx)
 {
-    uint64_t next_time = time_check_arg->current_time + time_check_arg->delta_t;
-    uint64_t next_event_time = (fuzi_q_ctx->next_success_time < fuzi_q_ctx->end_of_time) ?
-        fuzi_q_ctx->next_success_time : fuzi_q_ctx->end_of_time;
+    uint64_t next_event_time = UINT64_MAX;
 
     if (fuzi_q_ctx->fuzz_mode == fuzi_q_mode_client) {
+        next_event_time = fuzi_q_ctx->end_of_time;
+        if (next_event_time > fuzi_q_ctx->next_success_time) {
+            next_event_time = fuzi_q_ctx->next_success_time;
+        }
         for (size_t i = 0; i < fuzi_q_ctx->nb_cnx_ctx; i++) {
             if (fuzi_q_ctx->cnx_ctx[i].cnx_client != NULL &&
                 fuzi_q_ctx->cnx_ctx[i].next_time < next_event_time) {
@@ -386,6 +398,14 @@ void fuzi_q_check_time(fuzi_q_ctx_t* fuzi_q_ctx, packet_loop_time_check_arg_t* t
             }
         }
     }
+
+    return next_event_time;
+}
+
+void fuzi_q_check_time(fuzi_q_ctx_t* fuzi_q_ctx, packet_loop_time_check_arg_t* time_check_arg)
+{
+    uint64_t next_time = time_check_arg->current_time + time_check_arg->delta_t;
+    uint64_t next_event_time = fuzi_q_next_time(fuzi_q_ctx);
 
     if (next_event_time < next_time) {
         time_check_arg->delta_t = next_time - time_check_arg->current_time;
@@ -397,6 +417,7 @@ int fuzi_q_client_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
 {
     int ret = 0;
     fuzi_q_ctx_t* fuzi_q_ctx = (fuzi_q_ctx_t *)callback_ctx;
+    int is_active = 0;
 
     if (fuzi_q_ctx == NULL) {
         ret = PICOQUIC_ERROR_UNEXPECTED_ERROR;
@@ -418,7 +439,7 @@ int fuzi_q_client_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
         case picoquic_packet_loop_after_send:
             /* check whether some connections were closed. */
             /* check whether at least one connection succeeded. */
-            ret = fuzi_q_loop_check_cnx(fuzi_q_ctx, picoquic_get_quic_time(fuzi_q_ctx->quic));
+            ret = fuzi_q_loop_check_cnx(fuzi_q_ctx, picoquic_get_quic_time(fuzi_q_ctx->quic), &is_active);
             break;
         case picoquic_packet_loop_port_update:
             break;
@@ -445,13 +466,14 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
     /* Start: start the QUIC process with cert and key files */
     int ret = 0;
     fuzi_q_ctx_t fuzi_q_ctx = { 0 };
+    int is_active = 0;
 
     ret = fuzi_q_set_client_context(fuzz_mode, &fuzi_q_ctx, ip_address_text, server_port,
         config, nb_cnx_required, duration_max, client_scenario_text, NULL);
 
     /* Start the client connections */
     if (ret == 0) {
-        ret = fuzi_q_loop_check_cnx(&fuzi_q_ctx, picoquic_get_quic_time(fuzi_q_ctx.quic));
+        ret = fuzi_q_loop_check_cnx(&fuzi_q_ctx, picoquic_get_quic_time(fuzi_q_ctx.quic), &is_active);
     }
     /* Wait for packets */
     if (ret == 0) {

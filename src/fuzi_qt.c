@@ -44,6 +44,7 @@ typedef enum {
 static const fuzi_q_test_def_t test_table[] =
 {
     { "basic", fuzi_q_basic_test },
+    { "basic_client", fuzi_q_basic_client_test },
     { "icid_table", icid_table_test}
 };
 

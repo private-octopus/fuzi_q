@@ -36,8 +36,8 @@ uint32_t basic_packet_fuzzer(fuzzer_ctx_t* ctx, uint64_t fuzz_pilot,
     int should_fuzz = 0;
     uint32_t fuzz_index = 0;
 
-    /* Once in 16, fuzz by changing the length */
-    if ((fuzz_pilot & 0xF) == 0xD) {
+    /* Once in 64, fuzz by changing the length */
+    if ((fuzz_pilot & 0x3F) == 0xD) {
         uint32_t fuzz_length_max = (uint32_t)(length + 16u);
         uint32_t fuzzed_length;
 
@@ -59,15 +59,19 @@ uint32_t basic_packet_fuzzer(fuzzer_ctx_t* ctx, uint64_t fuzz_pilot,
         }
         ctx->nb_fuzzed_length++;
     }
-
-    /* Find the position that shall be fuzzed */
-    fuzz_index = (uint32_t)((fuzz_pilot & 0xFFFF) % length);
-    fuzz_pilot >>= 16;
-    while (fuzz_pilot != 0 && fuzz_index < length) {
-        /* flip one byte */
-        bytes[fuzz_index++] = (uint8_t)(fuzz_pilot & 0xFF);
-        fuzz_pilot >>= 8;
-        ctx->nb_fuzzed++;
+    else {
+        size_t fuzz_target = length - header_length;
+        if (fuzz_target > 0) {
+            /* Find the position that shall be fuzzed */
+            fuzz_index = (uint32_t)(header_length + (fuzz_pilot & 0xFFFF) % fuzz_target);
+            fuzz_pilot >>= 16;
+            while (fuzz_pilot != 0 && fuzz_index < length) {
+                /* flip one byte */
+                bytes[fuzz_index++] = (uint8_t)(fuzz_pilot & 0xFF);
+                fuzz_pilot >>= 8;
+                ctx->nb_fuzzed++;
+            }
+        }
     }
 
     return (uint32_t)length;
@@ -192,6 +196,13 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     if (icid_ctx != NULL) {
         ctx->nb_packets++;
         ctx->nb_packets_state[fuzz_cnx_state] += 1;
+#if 1
+        if (fuzz_cnx_state == fuzzer_cnx_state_initial &&
+            icid_ctx->target_state != fuzzer_cnx_state_initial)
+        {
+            DBG_PRINTF("%s", "Bug");
+        }
+#endif
         /* Only perform fuzzing if the connection has reached or passed the target state */
         if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
              /* Based on the fuzz pilot, pick one of the following */
@@ -261,7 +272,7 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
         /* Mark the connection as active */
         if (ctx->parent != NULL) {
             /* Mark active */
-            fuzi_q_mark_active(ctx->parent, &icid_ctx->icid, current_time);
+            fuzi_q_mark_active(ctx->parent, &icid_ctx->icid, current_time, icid_ctx->already_fuzzed);
         }
     }
 

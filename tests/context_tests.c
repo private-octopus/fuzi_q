@@ -48,6 +48,50 @@ picoquic_connection_id_t test_icid[] = {
 
 size_t nb_test_icid = sizeof(test_icid) / sizeof(picoquic_connection_id_t);
 
+int icid_table_check_chain(fuzzer_ctx_t* ctx, size_t nb_expected)
+{
+    int ret = 0;
+    /* Check MRU chain */
+    size_t mru_count = 0;
+    size_t lru_count = 0;
+    fuzzer_icid_ctx_t* next = ctx->icid_mru;
+    while (ret == 0) {
+        if (next == NULL) {
+            if (mru_count < nb_expected) {
+                ret = -1;
+            }
+            break;
+        }
+        else {
+            mru_count++;
+            if (mru_count > nb_expected) {
+                ret = -1;
+                break;
+            }
+            next = next->icid_after;
+        }
+    }
+    /* Check MRU chain */
+    next = ctx->icid_lru;
+    while (ret == 0) {
+        if (next == NULL) {
+            if (lru_count < nb_expected) {
+                ret = -1;
+            }
+            break;
+        }
+        else {
+            lru_count++;
+            if (lru_count > nb_expected) {
+                ret = -1;
+                break;
+            }
+            next = next->icid_before;
+        }
+    }
+    return ret;
+}
+
 int icid_table_test()
 {
     int ret = 0;
@@ -63,6 +107,12 @@ int icid_table_test()
         for (size_t i = 0; i < nb_test_icid; i++) {
             current_time += 1000000;
             (void)fuzzer_get_icid_ctx(&ctx, &test_icid[i], current_time);
+            if (ret == 0) {
+                ret = icid_table_check_chain(&ctx, ctx.icid_tree.size);
+                if (ret != 0) {
+                    DBG_PRINTF("Chain invalid after %zu trials, step %zu", trials + 1, i);
+                }
+            }
         }
         if (ret == 0 && ctx.icid_tree.size != nb_test_icid)
         {
@@ -90,6 +140,13 @@ int icid_table_test()
         if (ret == 0 && fuzz_cnx_ctx != NULL) {
             DBG_PRINTF("%s", "One entry too many!");
             ret = -1;
+        }
+
+        if (ret == 0) {
+            ret = icid_table_check_chain(&ctx, nb_test_icid);
+            if (ret != 0) {
+                DBG_PRINTF("Chain invalid after %d trials", trials+1);
+            }
         }
     }
 
