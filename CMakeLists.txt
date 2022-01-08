@@ -44,11 +44,9 @@ message(STATUS "OpenSSL_LIBRARIES: ${OPENSSL_LIBRARIES}")
 include_directories(include lib tests 
     ${Picoquic_INCLUDE_DIRS} ${PTLS_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
-add_library(fuzy_q-core
-    ${FUZI_Q_LIBRARY_FILES}
-)
+add_library(fuzy_q_core ${FUZI_Q_LIBRARY_FILES} )
 
-add_library(fuzi_q-tests
+add_library(fuzi_q_tests
     ${FUZI_QTEST_LIBRARY_FILES}
 )
 
@@ -57,7 +55,7 @@ add_executable(fuzi_q
 )
 
 target_link_libraries(fuzi_q
-    fuzi_q-core
+    fuzy_q_core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}
@@ -70,8 +68,8 @@ add_executable(fuzi_qt
 )
 
 target_link_libraries(fuzi_qt
-    fuzi_q-tests
-    fuzi_q-core
+    fuzi_q_tests
+    fuzy_q_core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}
