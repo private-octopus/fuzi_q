@@ -33,7 +33,7 @@ jobs:
           make
           ulimit -c unlimited -S
           pwd
-          ./fuzi_q_t -P ../../picoquic && FZQRESULT=$? 
+          ./fuzi_qt -P ../../picoquic && FZQRESULT=$? 
           if [ "${FZQRESULT}" == 0 ]; then exit 0; fi;
           exit 1
 
