@@ -17,10 +17,12 @@ set(FUZI_QLIBRARY_FILES
     lib/fuzzer_frames.c
     lib/client.c
     lib/server.c
+    lib/context.c
 )
 
 set(FUZI_QTEST_LIBRARY_FILES
     tests/basic_test.c
+    tests/context_tests.c
 )
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -55,7 +57,6 @@ add_executable(fuzi_q
 )
 
 target_link_libraries(fuzi_q
-    fuzi_q-tests
     fuzi_q-core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
