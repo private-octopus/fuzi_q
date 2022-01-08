@@ -78,12 +78,6 @@ static void fuzi_q_icid_list_delete_node(void* tree, picosplay_node_t* node)
     }
 }
 
-static void fuzi_q_icid_list_init(fuzzer_ctx_t* ctx)
-{
-    picosplay_init_tree(&ctx->icid_tree, fuzi_q_icid_list_compare,
-        fuzi_q_icid_list_create_node, fuzi_q_icid_list_delete_node, fuzi_q_icid_list_node_value);
-}
-
 static void remove_last_icid_from_list(fuzzer_ctx_t * ctx)
 {
     if (ctx->icid_lru != NULL) {
