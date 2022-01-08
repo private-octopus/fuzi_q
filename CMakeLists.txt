@@ -12,22 +12,24 @@ if(DISABLE_DEBUG_PRINTF)
     set(CMAKE_C_FLAGS "-DDISABLE_DEBUG_PRINTF ${CMAKE_C_FLAGS}")
 endif()
 
-set(FUZI_QLIBRARY_FILES
+set(FUZI_Q_LIBRARY_FILES
     lib/fuzzer.c
     lib/fuzzer_frames.c
     lib/client.c
     lib/server.c
+    lib/context.c
 )
 
 set(FUZI_QTEST_LIBRARY_FILES
     tests/basic_test.c
+    tests/context_tests.c
 )
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Picoquic REQUIRED)
 message(STATUS "Picoquic/include: ${Picoquic_INCLUDE_DIRS}" )
-message(STATUS "Picoquic library: ${Picoquic_LIBRARIES}" )
+message(STATUS "Picohttp library: ${Picoquic_LIBRARIES}" )
 
 find_package(PTLS REQUIRED)
 message(STATUS "picotls/include: ${PTLS_INCLUDE_DIRS}" )
@@ -42,11 +44,9 @@ message(STATUS "OpenSSL_LIBRARIES: ${OPENSSL_LIBRARIES}")
 include_directories(include lib tests 
     ${Picoquic_INCLUDE_DIRS} ${PTLS_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 
-add_library(fuzy_q-core
-    ${FUZI_QLIBRARY_FILES}
-)
+add_library(fuzy_q_core ${FUZI_Q_LIBRARY_FILES} )
 
-add_library(fuzi_q-tests
+add_library(fuzi_q_tests
     ${FUZI_QTEST_LIBRARY_FILES}
 )
 
@@ -55,8 +55,7 @@ add_executable(fuzi_q
 )
 
 target_link_libraries(fuzi_q
-    fuzi_q-tests
-    fuzi_q-core
+    fuzy_q_core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}
@@ -69,8 +68,8 @@ add_executable(fuzi_qt
 )
 
 target_link_libraries(fuzi_qt
-    fuzi_q-tests
-    fuzi_q-core
+    fuzi_q_tests
+    fuzy_q_core
     ${Picoquic_LIBRARIES}
     ${PTLS_LIBRARIES}
     ${OPENSSL_LIBRARIES}

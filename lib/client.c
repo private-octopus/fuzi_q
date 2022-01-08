@@ -482,7 +482,7 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
             (int)fuzi_q_ctx.socket_buffer_size, fuzi_q_client_loop_cb, &fuzi_q_ctx);
 #else
         ret = picoquic_packet_loop(fuzi_q_ctx.quic, 0, fuzi_q_ctx.server_address.ss_family, 0,
-            fuzi_q_ctx.socket_buffer_size, client_loop_cb, &fuzi_q_ctx);
+            fuzi_q_ctx.socket_buffer_size, 0, fuzi_q_client_loop_cb, &fuzi_q_ctx);
 #endif
     }
 

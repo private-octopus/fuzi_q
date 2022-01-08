@@ -599,7 +599,6 @@ int fuzi_q_basic_test_loop(int fuzz_client, int fuzz_server, int simulate_loss)
     fuzi_q_mode_enum server_fuzz_mode = (fuzz_server) ? fuzi_q_mode_server : fuzi_q_mode_clean_server;
     int nb_steps = 0;
     int nb_inactive = 0;
-    int is_closed = 0;
     size_t nb_cnx_required = 16;
     const uint64_t max_time = 360000000;
     const int max_inactive = 128;
