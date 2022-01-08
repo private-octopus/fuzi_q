@@ -14,7 +14,7 @@ find_path(Picoquic_BINLOG_DIR
           ../picotls/picoquic/ )
 
 find_path(Picoquic_HTTP_DIR
-    NAMES qserver.h
+    NAMES demoserver.h
     HINTS ${CMAKE_SOURCE_DIR}/../picoquic/picohttp
           ${CMAKE_BINARY_DIR}/../picoquic/picohttp
           ../picotls/picoquic/ )
@@ -31,7 +31,10 @@ include(FindPackageHandleStandardArgs)
 # if all listed variables are TRUE
 find_package_handle_standard_args(Picoquic REQUIRED_VARS
     Picoquic_CORE_LIBRARY
-    Picoquic_INCLUDE_DIR)
+    Picohttp_CORE_LIBRARY
+    Picoquic_INCLUDE_DIR
+    Picoquic_BINLOG_DIR
+    Picoquic_HTTP_DIR)
 
 if(Picoquic_FOUND)
     set(Picoquic_LIBRARIES
