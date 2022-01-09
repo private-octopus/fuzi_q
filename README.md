@@ -1,5 +1,5 @@
 # fuzi_q
-Over the net fuzzing of QUIC servers or clients.
+## Over the net fuzzing of QUIC servers or clients.
 
 Fuzi_q started from the testsuite of [picoquic](https://github.com/private-octopus/picoquic).
 Picoquic is an implementation of QUIC written in C, and there is always
@@ -25,6 +25,9 @@ room for more sophistication. Suggestions are welcome.
 
 Fuzi_q can be used as a client to test a QUIC server, or as a server to test
 a QUIC client.
+
+A list of bugs surfaced using Fuzi_Q is available on
+[this wiki page](https://github.com/private-octopus/fuzi_q/wiki/Bugs-found-using-Fuzi_Q).
 
 The Fuzi_q code uses Picoquic, which itself relies on
 [Picotls](https://github.com/h2o/picotls) and on OpenSSL libraries.
