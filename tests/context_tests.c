@@ -99,7 +99,7 @@ int icid_table_test()
     fuzzer_icid_ctx_t* fuzz_cnx_ctx;
     fuzzer_ctx_t ctx = { 0 };
 
-    fuzi_q_fuzzer_init(&ctx, 0);
+    fuzi_q_fuzzer_init(&ctx, NULL, NULL);
 
     for (int trials = 0; ret == 0 && trials < 3; trials++)
     {

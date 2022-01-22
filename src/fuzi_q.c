@@ -66,7 +66,7 @@
 void usage()
 {
     fprintf(stderr, "fuzi_q: over the net quic fuzzer\n");
-    fprintf(stderr, "Usage: fuzi_q <options> [fuzz_mode] [server_name port [scenario]] \n");
+    fprintf(stderr, "Usage: fuzi_q <options> fuzz_mode [server_name port [scenario]] \n");
     fprintf(stderr, "  fuzz_mode can be one of client, clean or server.");
     fprintf(stderr, "  For the client or clean fuzz_mode, specify server_name and port.\n");
     fprintf(stderr, "  For the server fuzz_mode, use -p to specify the port,\n");
@@ -75,8 +75,22 @@ void usage()
     fprintf(stderr, "fuzi_q options:\n");
     fprintf(stderr, "  -f nb_fuzz_trials     Number of trials to be attempted.\n");
     fprintf(stderr, "  -d duration_max       Duration of the test, in seconds.\n");
+    fprintf(stderr, "  -X initial_cid        CID of first client connection.\n");
     fprintf(stderr, "\nThe scenario argument is same as for picoquicdemo.\n");
+    fprintf(stderr, "\nThe fuzzing of a connection depends on the value of the initial CID for that connection. On the client,\n");
+    fprintf(stderr, "these CIDs are derived from the previous one using SHA 256. By default, the very first CID is picked\n");
+    fprintf(stderr, "at random, but it can be specifed using the parameter -X when reproducing a previous fuzz.\n");
     exit(1);
+}
+
+int fuzi_q_derive_cid(char const* argv, picoquic_connection_id_t* init_cid)
+{
+    int ret = 0;
+    uint8_t l = picoquic_parse_connection_id_hexa(argv, strlen(argv), init_cid);
+    if (l < 8) {
+        ret = -1;
+    }
+    return ret;
 }
 
 int main(int argc, char** argv)
@@ -91,14 +105,15 @@ int main(int argc, char** argv)
     size_t nb_fuzz_trials = 0;
     uint64_t fuzz_duration_max = 0;
     int arg_as_int;
+    picoquic_connection_id_t init_cid = { 0 };
     char const* scenario = NULL;
 #ifdef _WINDOWS
     WSADATA wsaData = { 0 };
     (void)WSA_START(MAKEWORD(2, 2), &wsaData);
 #endif
     picoquic_config_init(&config);
-    memcpy(option_string, "d:f:", 4);
-    ret = picoquic_config_option_letters(option_string + 4, sizeof(option_string) - 4, NULL);
+    memcpy(option_string, "d:f:X:", 6);
+    ret = picoquic_config_option_letters(option_string + 6, sizeof(option_string) - 6, NULL);
 
     if (ret == 0) {
         /* Get the parameters */
@@ -120,6 +135,12 @@ int main(int argc, char** argv)
                 }
                 else {
                     nb_fuzz_trials = (size_t)arg_as_int;
+                }
+                break;
+            case 'X':
+                if (fuzi_q_derive_cid(optarg, &init_cid) != 0) {
+                    fprintf(stderr, "incorrect CID value: %s\n", optarg);
+                    usage();
                 }
                 break;
             default:
@@ -183,7 +204,7 @@ int main(int argc, char** argv)
 
     /* Run */
     if (fuzz_mode == fuzi_q_mode_client || fuzz_mode == fuzi_q_mode_clean) {
-        ret = fuzi_q_client(fuzz_mode, server_name, server_port, &config, nb_fuzz_trials, fuzz_duration_max, scenario);
+        ret = fuzi_q_client(fuzz_mode, server_name, server_port, &config, nb_fuzz_trials, fuzz_duration_max, &init_cid, scenario);
     }
     else {
         ret = fuzi_q_server(fuzz_mode, &config, fuzz_duration_max);
