@@ -56,6 +56,7 @@
 
 #include <picoquic.h>
 #include <picosocks.h>
+#include <picoquic_utils.h>
 #include <picoquic_config.h>
 #include <picoquic_packet_loop.h>
 #include <autoqlog.h>
