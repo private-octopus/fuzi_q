@@ -25,6 +25,7 @@
 #include <picoquic.h>
 #include <picoquic_internal.h>
 #include <picoquic_utils.h>
+#include <tls_api.h>
 #include "fuzi_q.h"
 
 /* Management of per connection context for fuzzing. */
@@ -147,21 +148,53 @@ fuzzer_icid_ctx_t* fuzzer_get_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection_id
     return icid_ctx;
 }
 
-/* Management of the fuzzer context itself
+/* Management of the fuzzer context itself.
+ * Add definition of picoquic crypto random, so we can use it to 
+ * initialize randomness when needed.
  */
 
-void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, uint64_t tweak)
+void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, picoquic_connection_id_t * init_cid, picoquic_quic_t * quic)
 {
     memset(fuzz_ctx, 0, sizeof(fuzzer_ctx_t));
     /* Initialize the tree of connection contexts */
     picosplay_init_tree(&fuzz_ctx->icid_tree, fuzi_q_icid_list_compare,
         fuzi_q_icid_list_create_node, fuzi_q_icid_list_delete_node, fuzi_q_icid_list_node_value);
-    /* Random seed depends on duration, so different durations do not all start
-     * with exactly the same message sequences. */
-    fuzz_ctx->random_context = 0xDEADBEEFBABACAFEull;
-    fuzz_ctx->random_context ^= tweak;
+    /* Init CID. If not already set, initialize from random number */
+    if (init_cid == NULL || init_cid->id_len == 0) {
+        if (quic != NULL) {
+            picoquic_crypto_random(quic, fuzz_ctx->next_cid.id, 8);
+            fuzz_ctx->next_cid.id_len = 8;
+        }
+        else {
+            picoquic_connection_id_t default_init_cid = { { 0xDE, 0xAD, 0xBE, 0xEF, 0xBA, 0xBA, 0xCA, 0xFE }, 8 };
+            fuzz_ctx->next_cid = default_init_cid;
+        }
+    }
+    else {
+        fuzz_ctx->next_cid = *init_cid;
+    }
 }
 
+
+/* Create a random CID as a hash of the previous one.
+ * This is useful for ensuring that the client tests are repeatable.
+ */
+
+void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
+{
+    /* Set a hash context for derivation of random CID */
+    void * hash_context = picoquic_hash_create("SHA256");
+    uint8_t hash_buffer[256] = { 0 };
+    /* Use the CID that was already prepared */
+    *icid = ctx->next_cid;
+    /* Derive the next CID from the previous value using SHA 256 */
+    picoquic_hash_update((uint8_t *)"fuzi_q", 6, hash_context);
+    picoquic_hash_update(ctx->next_cid.id, ctx->next_cid.id_len, hash_context);
+    picoquic_hash_finalize(hash_buffer, hash_context);
+    memcpy(ctx->next_cid.id, hash_buffer, ctx->next_cid.id_len);
+}
+
+/* Release the fuzzer context */
 void fuzi_q_fuzzer_release(fuzzer_ctx_t* fuzz_ctx)
 {
     picosplay_empty_tree(&fuzz_ctx->icid_tree);

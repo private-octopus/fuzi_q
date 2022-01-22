@@ -84,7 +84,7 @@ typedef struct st_fuzzer_ctx_t {
     fuzzer_icid_ctx_t* icid_mru;
     fuzzer_icid_ctx_t* icid_lru;
     struct st_fuzi_q_ctx_t* parent;
-    uint64_t random_context;
+    picoquic_connection_id_t next_cid;
     size_t nb_cnx_tried[fuzzer_cnx_state_max];
     size_t nb_cnx_fuzzed[fuzzer_cnx_state_max];
     size_t nb_packets_fuzzed[fuzzer_cnx_state_max];
@@ -113,8 +113,8 @@ extern size_t nb_fuzi_q_frame_list;
 
 uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length);
-
-void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, uint64_t tweak);
+void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid);
+void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, picoquic_connection_id_t* init_cid, picoquic_quic_t* quic);
 void fuzi_q_fuzzer_release(fuzzer_ctx_t* fuzz_ctx);
 
 /* Unification of initial and basic fuzzer
@@ -168,11 +168,12 @@ typedef struct st_fuzi_q_ctx_t {
 int fuzi_q_server(fuzi_q_mode_enum fuzz_mode, picoquic_quic_config_t* config, uint64_t duration_max);
 int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
-    char const* client_scenario_text);
+    picoquic_connection_id_t* init_cid, char const* client_scenario_text);
 void fuzi_q_release_client_context(fuzi_q_ctx_t* fuzi_q_ctx);
 void fuzi_q_mark_active(fuzi_q_ctx_t* fuzi_q_ctx, picoquic_connection_id_t* icid, uint64_t current_time, int was_fuzzed);
 uint64_t fuzi_q_next_time(fuzi_q_ctx_t* fuzi_q_ctx);
 int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time, int * is_active);
+void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid);
 
 #ifdef __cplusplus
 }

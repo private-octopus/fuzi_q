@@ -27,6 +27,7 @@
 #include <picoquic_packet_loop.h>
 #include <autoqlog.h>
 #include <performance_log.h>
+#include <tls_api.h>
 #include "fuzi_q.h"
 
 /* The fuzzer can be used with multiple applications, with multiple ALPN.
@@ -63,18 +64,6 @@ void fuzi_q_release_connection(fuzi_q_cnx_ctx_t* cnx_ctx)
         picoquic_delete_cnx(cnx_ctx->cnx_client);
     }
     memset(cnx_ctx, 0, sizeof(fuzi_q_cnx_ctx_t));
-}
-
-
-/* Create a random CID. This is useful for ensuring that the client tests are repeatable */
-void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
-{
-    uint64_t random_64 = picoquic_test_random(&ctx->random_context);
-    for (int i = 0; i < 8; i++) {
-        icid->id[i] = (uint8_t)(random_64 & 0xff);
-        random_64 >>= 8;
-    }
-    icid->id_len = 8;
 }
 
 /* Mark connection active */
@@ -177,7 +166,7 @@ static const char* test_scenario_default = "0:index.html;4:test.html;8:/1234567;
  * 
  */
 int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_ctx, const char* ip_address_text, int server_port,
-    picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max, 
+    picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max, picoquic_connection_id_t* init_cid,
     char const* client_scenario_text, uint64_t* virtual_time)
 {
     int ret = 0;
@@ -235,7 +224,7 @@ int fuzi_q_set_client_context(fuzi_q_mode_enum fuzz_mode, fuzi_q_ctx_t* fuzi_q_c
             ret = -1;
         }
         else {
-            fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+            fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, init_cid, fuzi_q_ctx->quic);
             fuzi_q_ctx->fuzz_ctx.parent = fuzi_q_ctx;
             if (fuzz_mode != fuzi_q_mode_clean) {
                 picoquic_set_fuzz(fuzi_q_ctx->quic, fuzi_q_fuzzer, &fuzi_q_ctx->fuzz_ctx);
@@ -372,7 +361,7 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time, int *
     }
 
     if (ret == 0 && nb_active == 0) {
-        ret = PICOQUIC_NO_ERROR_TERMINATE_PACKET_LOOP;
+           ret = PICOQUIC_NO_ERROR_TERMINATE_PACKET_LOOP;
     }
     else if (current_time > fuzi_q_ctx->next_success_time) {
         fuzi_q_ctx->server_is_down = 1;
@@ -461,7 +450,7 @@ int fuzi_q_client_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
  */
 int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int server_port,
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
-    char const* client_scenario_text)
+    picoquic_connection_id_t * init_cid, char const* client_scenario_text)
 {
     /* Start: start the QUIC process with cert and key files */
     int ret = 0;
@@ -469,7 +458,7 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
     int is_active = 0;
 
     ret = fuzi_q_set_client_context(fuzz_mode, &fuzi_q_ctx, ip_address_text, server_port,
-        config, nb_cnx_required, duration_max, client_scenario_text, NULL);
+        config, nb_cnx_required, duration_max, init_cid, client_scenario_text, NULL);
 
     /* Start the client connections */
     if (ret == 0) {

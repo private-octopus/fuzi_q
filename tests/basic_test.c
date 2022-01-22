@@ -443,7 +443,7 @@ int fuzi_q_set_test_client_ctx(fuzi_q_test_config_t* test_config, fuzi_q_ctx_t* 
             ret = -1;
         }
         else {
-            fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+            fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, NULL, NULL);
             fuzi_q_ctx->fuzz_ctx.parent = fuzi_q_ctx;
             if (fuzz_mode != fuzi_q_mode_clean) {
                 picoquic_set_fuzz(fuzi_q_ctx->quic, fuzi_q_fuzzer, &fuzi_q_ctx->fuzz_ctx);
@@ -503,7 +503,7 @@ int fuzi_q_set_test_server_ctx(fuzi_q_test_config_t* test_config, fuzi_q_ctx_t* 
     }
     else {
         fuzi_q_ctx->fuzz_mode = fuzz_mode;
-        fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, duration_max);
+        fuzi_q_fuzzer_init(&fuzi_q_ctx->fuzz_ctx, NULL, NULL);
         if (fuzz_mode != fuzi_q_mode_clean_server) {
             picoquic_set_fuzz(fuzi_q_ctx->quic, fuzi_q_fuzzer, &fuzi_q_ctx->fuzz_ctx);
         }
