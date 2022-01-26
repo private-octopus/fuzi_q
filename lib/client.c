@@ -84,12 +84,27 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
 {
     /* Create the client connection, from parameters in fuzi_q context. */
     int ret = 0;
+    char const* alpn = fuzi_q_ctx->alpn;
+    uint32_t proposed_version = fuzi_q_ctx->proposed_version;
+    char const* ticket_alpn = NULL;
+    uint32_t ticket_version = 0;
     /* Create a predictable and random ICID */
     fuzzer_random_cid(&fuzi_q_ctx->fuzz_ctx, &cnx_ctx->icid);
+    /* Try pick the ALPN and version from tickets if there are any */
+
+    if (picoquic_demo_client_get_alpn_and_version_from_tickets(fuzi_q_ctx->quic, PICOQUIC_TEST_SNI, alpn,
+        proposed_version, current_time, &ticket_alpn, &ticket_version) == 0) {
+        if (ticket_version != 0) {
+            proposed_version = ticket_version;
+        }
+        if (ticket_alpn != NULL) {
+            alpn = ticket_alpn;
+        }
+    }
     /* Create a client connection */
     cnx_ctx->cnx_client = picoquic_create_cnx(fuzi_q_ctx->quic, cnx_ctx->icid, picoquic_null_connection_id,
         (struct sockaddr*)&fuzi_q_ctx->server_address, current_time,
-        0, PICOQUIC_TEST_SNI, NULL, 1);
+        proposed_version, PICOQUIC_TEST_SNI, alpn, 1);
 
     if (cnx_ctx->cnx_client == NULL) {
         ret = -1;
@@ -112,10 +127,6 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
                 cnx_ctx->callback_ctx.last_interaction_time = current_time;
                 cnx_ctx->callback_ctx.no_print = 1;
                 picoquic_set_callback(cnx_ctx->cnx_client, picoquic_demo_client_callback, &cnx_ctx->callback_ctx);
-
-                if (cnx_ctx->cnx_client->alpn == NULL) {
-                    picoquic_demo_client_set_alpn_from_tickets(cnx_ctx->cnx_client, &cnx_ctx->callback_ctx, current_time);
-                }
 
                 /* Requires TP grease and enable options for interop tests */
                 cnx_ctx->cnx_client->grease_transport_parameters = 1;
@@ -361,7 +372,7 @@ int fuzi_q_loop_check_cnx(fuzi_q_ctx_t* fuzi_q_ctx, uint64_t current_time, int *
     }
 
     if (ret == 0 && nb_active == 0) {
-           ret = PICOQUIC_NO_ERROR_TERMINATE_PACKET_LOOP;
+            ret = PICOQUIC_NO_ERROR_TERMINATE_PACKET_LOOP;
     }
     else if (current_time > fuzi_q_ctx->next_success_time) {
         fuzi_q_ctx->server_is_down = 1;

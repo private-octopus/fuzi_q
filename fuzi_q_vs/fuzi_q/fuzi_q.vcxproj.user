@@ -11,7 +11,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-x 32 -f 64 -q cclog -X 9f96410f526004fe clean ::1 4433 "0:/;4:0:/;8:4:/10000;"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-x 32 -f 64 -q cclog -X 9f96410f526004fe client ::1 4433 "0:/;4:0:/;8:4:/10000;"</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
