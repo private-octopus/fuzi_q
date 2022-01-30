@@ -182,18 +182,28 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
     uint32_t fuzzed_length = (uint32_t)length;
     int fuzz_again = ((fuzz_pilot & 0xf) <= 7);
 
-    if (fuzz_cnx_state < 0 || fuzz_cnx_state > fuzzer_cnx_state_max) {
+    if (fuzz_cnx_state < 0 || fuzz_cnx_state >= fuzzer_cnx_state_max) {
         fuzz_cnx_state = fuzzer_cnx_state_closing;
     }
 
     fuzz_pilot >>= 4;
 
-    if (icid_ctx != NULL) {
+    if (icid_ctx != NULL && icid_ctx->target_state < fuzzer_cnx_state_max && icid_ctx->target_state >= 0) {
         ctx->nb_packets++;
         ctx->nb_packets_state[fuzz_cnx_state] += 1;
-        /* Only perform fuzzing if the connection has reached or passed the target state */
-        if (fuzz_cnx_state >= icid_ctx->target_state && (!icid_ctx->already_fuzzed || fuzz_again)) {
-             /* Based on the fuzz pilot, pick one of the following */
+        icid_ctx->wait_count[fuzz_cnx_state]++;
+        /* Compute the max number of packets that could be waited for.
+         */
+        if (!icid_ctx->already_fuzzed && fuzz_cnx_state != fuzzer_cnx_state_closing &&
+            icid_ctx->wait_count[fuzz_cnx_state] > ctx->wait_max[fuzz_cnx_state]) {
+            ctx->wait_max[fuzz_cnx_state] = icid_ctx->wait_count[fuzz_cnx_state];
+        }
+        /* Only perform fuzzing if the connection has reached or passed the target state. */
+        if ((fuzz_cnx_state > icid_ctx->target_state ||
+            (fuzz_cnx_state == icid_ctx->target_state &&
+                icid_ctx->wait_count[fuzz_cnx_state] >= icid_ctx->target_wait)) &&
+            (!icid_ctx->already_fuzzed || fuzz_again)) {
+            /* Based on the fuzz pilot, pick one of the following */
             uint64_t next_step = fuzz_pilot & 0x03;
             size_t final_pad = length_non_padded(bytes, length, header_length);
             size_t fuzz_frame_id = (size_t)((fuzz_pilot >> 3) % nb_fuzi_q_frame_list);
@@ -253,6 +263,9 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
                 icid_ctx->already_fuzzed = 1;
                 ctx->nb_cnx_tried[icid_ctx->target_state] += 1;
                 ctx->nb_cnx_fuzzed[fuzz_cnx_state] += 1;
+                if (fuzz_cnx_state == icid_ctx->target_state && icid_ctx->wait_count[fuzz_cnx_state] > ctx->waited_max[icid_ctx->target_state]) {
+                    ctx->waited_max[icid_ctx->target_state] = icid_ctx->wait_count[fuzz_cnx_state];
+                }
             }
             ctx->nb_packets_fuzzed[fuzz_cnx_state] += 1;
         }
