@@ -578,12 +578,19 @@ int fuzi_q_test_check_fuzz(size_t nb_cnx_required, fuzzer_ctx_t * fuzz_ctx)
             DBG_PRINTF("No trials for connection fuzzing state %d", i);
             ret = -1;
         }
-        else if (fuzz_ctx->nb_cnx_tried[i] != fuzz_ctx->nb_cnx_fuzzed[i]) {
+        else if (fuzz_ctx->nb_cnx_tried[i] > fuzz_ctx->nb_cnx_fuzzed[i]) {
             DBG_PRINTF("Connection fuzzing state % d, tried %zu, fuzzed %zu", i,
                 fuzz_ctx->nb_cnx_tried[i], fuzz_ctx->nb_cnx_fuzzed[i]);
             ret = -1;
         }
     }
+
+    if (fuzz_ctx->wait_max[fuzzer_cnx_state_ready] <= 1 || fuzz_ctx->wait_max[fuzzer_cnx_state_ready] <= 1) {
+        DBG_PRINTF("Connection fuzzing state % d, wait_max %d, waited_max %d", fuzzer_cnx_state_ready,
+            fuzz_ctx->wait_max[fuzzer_cnx_state_ready], fuzz_ctx->waited_max[fuzzer_cnx_state_ready]);
+        ret = -1;
+    }
+
     if (total_tried != nb_cnx_required) {
         DBG_PRINTF("Tried %zu instead of %zu", total_tried, nb_cnx_required);
         ret = -1;

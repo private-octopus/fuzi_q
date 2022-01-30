@@ -76,6 +76,8 @@ typedef struct st_fuzzer_icid_ctx_t {
     uint64_t last_time;
     uint64_t random_context;
     fuzzer_cnx_state_enum target_state;
+    int target_wait;
+    int wait_count[fuzzer_cnx_state_max];
     int already_fuzzed;
 } fuzzer_icid_ctx_t;
 
@@ -89,6 +91,8 @@ typedef struct st_fuzzer_ctx_t {
     size_t nb_cnx_fuzzed[fuzzer_cnx_state_max];
     size_t nb_packets_fuzzed[fuzzer_cnx_state_max];
     size_t nb_packets_state[fuzzer_cnx_state_max];
+    int wait_max[fuzzer_cnx_state_max];
+    int waited_max[fuzzer_cnx_state_max];
     uint32_t nb_packets;
     uint32_t nb_fuzzed;
     uint32_t nb_fuzzed_length;

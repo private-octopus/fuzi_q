@@ -95,7 +95,9 @@ static fuzzer_icid_ctx_t* create_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection
         icid_ctx->random_context = picoquic_connection_id_hash(icid);
         /* Set the initial values, e.g. target state */
         uint64_t random_state = (icid_ctx->random_context ^ 0xdeadbeefc001cafeull) % fuzzer_cnx_state_max;
+        uint64_t random_wait = (icid_ctx->random_context >> 2) ^ 0xa1a2a3a4a5a6a7a8ull;
         icid_ctx->target_state = (fuzzer_cnx_state_enum)random_state;
+        icid_ctx->target_wait = ((int)random_wait) % (ctx->wait_max[icid_ctx->target_state]+1);
         if (ctx->icid_mru != NULL) {
             ctx->icid_mru->icid_before = icid_ctx;
             icid_ctx->icid_after = ctx->icid_mru;
@@ -159,6 +161,10 @@ void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, picoquic_connection_id_t * init_
     /* Initialize the tree of connection contexts */
     picosplay_init_tree(&fuzz_ctx->icid_tree, fuzi_q_icid_list_compare,
         fuzi_q_icid_list_create_node, fuzi_q_icid_list_delete_node, fuzi_q_icid_list_node_value);
+    /* Set all wait_max to 1 */
+    for (int i = 0; i < fuzzer_cnx_state_max; i++) {
+        fuzz_ctx->wait_max[i] = 1;
+    }
     /* Init CID. If not already set, initialize from random number */
     if (init_cid == NULL || init_cid->id_len == 0) {
         if (quic != NULL) {
