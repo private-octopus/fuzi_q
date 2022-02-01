@@ -20,6 +20,7 @@
 */
 
 #include <picoquic.h>
+#include <picoquic_utils.h>
 #include <picoquic_internal.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -76,13 +77,166 @@ uint32_t basic_packet_fuzzer(fuzzer_ctx_t* ctx, uint64_t fuzz_pilot,
     return (uint32_t)length;
 }
 
+/* Frame specific fuzzers.
+ * Most frames contain a series of fields, with different fuzzing priorities:
+ * - The frame type should generally not be fuzzed, except for the rare cases when
+ *   it includes variables, e.g., stream data frames with Fin, Length and Offset bits.
+ * - Some frames contain data fields, such as content of data frames, or reason
+ *   phrase for connection close. Changing that content should be a very low
+ *   priority.
+ * - Some fields express lengths of content, e.g., length of data or length of
+ *   a reason phrase. There are interesting values that can be tried, such as
+ *   zero, larger than packet length, exactly 1 byte larger than packet length,
+ *   and of course any random value -- see varints.
+ * - When fields include stream identifiers, interesting values include streams
+ *   that are not open yet, streams that are open and different from current,
+ *   old streams that are now closed, and of course random values.
+ * - When fields are expressed as varint, it might be interesting to try
+ *   specific values like FFFFFFFF, FFFF, FFFFFFFFFFFFFFFF, etc. And of course
+ *   any random value.
+ * A fraction of fuzzing attempts should avoid being smart: just flip random
+ * bytes somewhere in the frame. As the number of fuzzing attempts increase,
+ * it may be a good idea to increase that fraction.
+ */
+
+void fuzz_random_byte(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    if (bytes != NULL) {
+        size_t l = bytes_max - bytes;
+        size_t x = fuzz_pilot % l;
+        uint8_t byte_mask = (uint8_t)(fuzz_pilot >> 8);
+        bytes[x] ^= byte_mask;
+    }
+}
+
+uint8_t* fuzz_in_place_or_skip_varint(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max, int do_fuzz)
+{
+    if (bytes != NULL) {
+        uint8_t* head_bytes = bytes;
+        bytes = (uint8_t *)picoquic_frames_varint_skip(bytes, bytes_max);
+        if (bytes != NULL && do_fuzz){
+            size_t l = bytes - head_bytes;
+            size_t x = fuzz_pilot % l;
+            uint8_t byte_mask = (uint8_t)(fuzz_pilot >> 3);
+            if (x == 0) {
+                byte_mask &= 0x3f;
+            }
+            bytes[x] ^= byte_mask;
+        }
+    }
+    return bytes;
+}
+
+/* ACK frame fuzzer.
+ */
+
+/* Stream frame fuzzer. 
+ * Variations:
+ *    -- flip a FIN bit
+ *    -- fuzz length
+ *    -- fuzz stream ID
+ *    -- fuzz illegal offset
+ * The fuzzing depends on how much space is available. It is always possible to
+ * fuzz "in place", rewriting a var int by a var int of the same length, but if
+ * there is space behind the frame it is also possible to extend the length of the
+ * fields.
+ */
+
+void stream_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    int was_fuzzed = 0;
+    uint8_t* first_byte = bytes;
+    /* From the type octet, get the various bits that could be flipped */
+    int len = bytes[0] & 2;
+    int off = bytes[0] & 4;
+    int fuzz_id = 0;
+    int fuzz_length = 0;
+    int fuzz_offset = 0;
+    int fuzz_stream_id = 0;
+    int fuzz_random = 0;
+
+    /* From the random field, select a framing variant.
+     * If selected field is omitted, fuzz the header instead.
+     */
+    uint64_t fuzz_variant = (fuzz_pilot ^ 0x57ea3f8a3ef822e8ull) % 5;
+
+    switch (fuzz_variant) {
+    case 0:
+        bytes[0] ^= 1;
+        break;
+    case 1:
+        if (len) {
+            /* fuzz the length */
+            fuzz_length = 1;
+        }
+        else {
+            bytes[0] ^= 2;
+        }
+        break;
+    case 2:
+        if (off) {
+            /* fuzz offset */
+            fuzz_offset = 1;
+        }
+        else {
+            bytes[0] ^= 4;
+        }
+        break;
+    case 3:
+        /* fuzz stream ID */
+        fuzz_stream_id = 1;
+        break;
+    default:
+        /* fuzz random byte */
+        break;
+    }
+
+    if (bytes < bytes_max) {
+        bytes++;
+    }
+    else {
+        bytes = NULL;
+    }
+
+    bytes = fuzz_in_place_or_skip_varint(fuzz_pilot, bytes, bytes_max, fuzz_stream_id);
+
+    if (off) {
+        bytes = fuzz_in_place_or_skip_varint(fuzz_pilot, bytes, bytes_max, fuzz_offset);
+    }
+
+    /* TODO: may want to be a bit smarter when fuzzing the length */
+    if (len) {
+        bytes = fuzz_in_place_or_skip_varint(fuzz_pilot, bytes, bytes_max, fuzz_length);
+    }
+
+    if (bytes != NULL && fuzz_random) {
+        fuzz_random_byte(fuzz_pilot, first_byte + 1, bytes_max);
+    }
+}
+
+/* Default frame fuzzer. Skip the frame type, then flip at random one of the first 8 bytes */
+void default_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    uint8_t* frame_byte = bytes;
+
+    bytes = (uint8_t *)picoquic_frames_varint_skip(bytes, bytes_max);
+
+    if (bytes == NULL || bytes >= bytes_max) {
+        bytes = frame_byte;
+    }
+    if (bytes + 8 < bytes_max) {
+        bytes_max = bytes + 8;
+    }
+    fuzz_random_byte(fuzz_pilot, bytes, bytes_max); 
+}
+
 #define FUZZER_MAX_NB_FRAMES 32
 
 int frame_header_fuzzer(uint64_t fuzz_pilot,
     uint8_t* bytes, size_t bytes_max, size_t length, size_t header_length)
 {
     uint8_t* frame_head[FUZZER_MAX_NB_FRAMES];
-    size_t frame_length[FUZZER_MAX_NB_FRAMES];
+    uint8_t* frame_next[FUZZER_MAX_NB_FRAMES];
     uint8_t* last_byte = bytes + bytes_max;
     size_t nb_frames = 0;
     int was_fuzzed = 0;
@@ -95,10 +249,11 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
         frame_head[nb_frames] = bytes;
         if (picoquic_skip_frame(bytes, last_byte - bytes, &consumed, &is_pure_ack) == 0) {
             bytes += consumed;
-            frame_length[nb_frames] = consumed;
+            frame_next[nb_frames] = bytes;
             nb_frames++;
         }
         else {
+            frame_next[nb_frames] = last_byte;
             bytes = NULL;
         }
     }
@@ -106,14 +261,15 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
     if (nb_frames > 0) {
         size_t fuzzed_frame = (size_t)(fuzz_pilot % nb_frames);
         uint8_t* frame_byte = frame_head[fuzzed_frame];
-        size_t fuzz_max = (frame_length[fuzzed_frame] > 9) ? 9 : frame_length[fuzzed_frame];
-        size_t fuzz_index = (fuzz_max > 1) ? (size_t)((fuzz_pilot >> 5) % (fuzz_max - 1)) + 1 : 0;
-        fuzz_pilot >>= 8;
-        while (fuzz_pilot != 0 && fuzz_index < fuzz_max) {
-            /* flip one byte */
-            frame_byte[fuzz_index++] = (uint8_t)(fuzz_pilot & 0xFF);
-            fuzz_pilot >>= 8;
-            was_fuzzed = 1;
+        uint8_t* frame_max = frame_next[fuzzed_frame];
+
+        fuzz_pilot >>= 5;
+
+        if (PICOQUIC_IN_RANGE(*frame_byte, picoquic_frame_type_stream_range_min, picoquic_frame_type_stream_range_max)) {
+            stream_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+        }
+        else {
+            default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
         }
     }
 
