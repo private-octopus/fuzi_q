@@ -128,7 +128,39 @@ uint8_t* fuzz_in_place_or_skip_varint(uint64_t fuzz_pilot, uint8_t* bytes, uint8
 }
 
 /* ACK frame fuzzer.
+ * ACK frame is composed of a series of varints. Default fuzz picks one of these varints
+ * at random and flips it.
  */
+void ack_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    /* Assume that we have short integers, one per byte */
+    size_t fuzz_target;
+    size_t nb_skipped = 0;
+    uint8_t * first_byte = bytes;
+    /* Count the varints in the list */
+    while (bytes != NULL && bytes < bytes_max) {
+        nb_skipped++;
+        bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max);
+    }
+    /* Pick one at random */
+    if (nb_skipped <= 1) {
+        fuzz_target = 0;
+    }
+    else {
+        fuzz_target = 1 + fuzz_pilot % (nb_skipped - 1);
+    }
+    fuzz_pilot >>= 8;
+    /* Skip all the varints before the selected one */
+    bytes = first_byte;
+    nb_skipped = 0;
+
+    while (bytes != NULL && bytes < bytes_max && nb_skipped < fuzz_target) {
+        nb_skipped++;
+        bytes = (uint8_t *)picoquic_frames_varint_skip(bytes, bytes_max);
+    }
+    /* Fuzz the selected varint */
+    fuzz_in_place_or_skip_varint(fuzz_pilot, bytes, bytes_max, 1);
+}
 
 /* Stream frame fuzzer. 
  * Variations:
@@ -239,7 +271,7 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
     uint8_t* frame_next[FUZZER_MAX_NB_FRAMES];
     uint8_t* last_byte = bytes + bytes_max;
     size_t nb_frames = 0;
-    int was_fuzzed = 0;
+    int was_fuzzed = 1;
 
     bytes += header_length;
 
@@ -269,7 +301,56 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
             stream_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
         }
         else {
-            default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+            switch (*frame_byte) {
+            case picoquic_frame_type_ack:
+            case picoquic_frame_type_ack_ecn:
+                ack_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
+            case picoquic_frame_type_padding:
+            case picoquic_frame_type_reset_stream:
+            case picoquic_frame_type_connection_close:
+            case picoquic_frame_type_application_close:
+            case picoquic_frame_type_max_data:
+            case picoquic_frame_type_max_stream_data:
+            case picoquic_frame_type_max_streams_bidir:
+            case picoquic_frame_type_max_streams_unidir:
+            case picoquic_frame_type_ping:
+            case picoquic_frame_type_data_blocked:
+            case picoquic_frame_type_stream_data_blocked:
+            case picoquic_frame_type_streams_blocked_bidir:
+            case picoquic_frame_type_streams_blocked_unidir:
+            case picoquic_frame_type_new_connection_id:
+            case picoquic_frame_type_stop_sending:
+            case picoquic_frame_type_path_challenge:
+            case picoquic_frame_type_path_response:
+            case picoquic_frame_type_crypto_hs:
+            case picoquic_frame_type_new_token:
+            case picoquic_frame_type_retire_connection_id:
+            case picoquic_frame_type_handshake_done:
+            case picoquic_frame_type_datagram:
+            case picoquic_frame_type_datagram_l:
+                default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
+            default: {
+                uint64_t frame_id64;
+                if (picoquic_frames_varint_decode(frame_byte, frame_max, &frame_id64) != NULL) {
+                    switch (frame_id64) {
+                    case picoquic_frame_type_ack_mp:
+                    case picoquic_frame_type_ack_mp_ecn:
+                        ack_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                        break;
+                    case picoquic_frame_type_ack_frequency:
+                    case picoquic_frame_type_time_stamp:
+                    case picoquic_frame_type_path_abandon:
+                    case picoquic_frame_type_bdp:
+                    default:
+                        default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                        break;
+                    }
+                }
+                break;
+            }
+            }
         }
     }
 
