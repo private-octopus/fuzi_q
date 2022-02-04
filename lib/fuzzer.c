@@ -188,12 +188,10 @@ void ack_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
 
 void stream_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
 {
-    int was_fuzzed = 0;
     uint8_t* first_byte = bytes;
     /* From the type octet, get the various bits that could be flipped */
     int len = bytes[0] & 2;
     int off = bytes[0] & 4;
-    int fuzz_id = 0;
     int fuzz_length = 0;
     int fuzz_offset = 0;
     int fuzz_stream_id = 0;
@@ -255,6 +253,165 @@ void stream_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max
 
     if (bytes != NULL && fuzz_random) {
         fuzz_random_byte(fuzz_pilot, first_byte + 1, bytes_max);
+    }
+}
+
+/* datagram fuzzer */
+void datagram_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    int len = bytes[0] & 1;
+    if (!len) {
+        /* Add a length type, of some length, so it can be fuzzed */
+        bytes[0] |= 1;
+        if (bytes < bytes_max) {
+            bytes[1] = (bytes[1] & 0x3f) | (((uint8_t)fuzz_pilot & 3) << 6);
+        }
+    }
+    /* Fuzz the length */
+    varint_frame_fuzzer(fuzz_pilot, bytes, bytes_max, 2);
+}
+
+/* Challenge frame fuzzer
+ * Type, and then 8 bytes.
+ * Can flip the type from response to challenge and vice verse,
+ * or change the value of the 8 byte response.
+ */
+void challenge_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    size_t x = fuzz_pilot % 41;
+
+    if (x == 0) {
+        bytes[0] ^= 1;
+    }
+    else {
+        x = 1 + ((x - 1) & 7);
+        if (bytes + x < bytes_max) {
+            bytes[x] ^= (uint8_t)(fuzz_pilot >> 5);
+        }
+    }
+}
+
+/* Padding fuzzer
+ * Replacing ping, pad or handshake done by one of the other types is a nice way to
+ * mess with the protocol machine. 
+ * Padding also is a nice space for inserting random stuff, to test various 
+ * potential failures.
+ */
+void padding_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    size_t l = bytes_max - bytes;
+    int fuzz_type = 1;
+
+    /* Test whether to mess with the type itself */
+    if (l > 1) {
+        fuzz_type = (fuzz_pilot & 7) == 0;
+        fuzz_pilot >>= 3;
+    }
+
+    /* if fuzzing the type.. */
+    if (fuzz_type) {
+        int flip = fuzz_pilot & 1;
+
+        switch (bytes[0]) {
+        case picoquic_frame_type_padding:
+            bytes[0] = (flip) ? picoquic_frame_type_ping : picoquic_frame_type_handshake_done;
+            break;
+        case picoquic_frame_type_ping:
+            bytes[0] = (flip) ? picoquic_frame_type_padding : picoquic_frame_type_handshake_done;
+            break;
+        case picoquic_frame_type_handshake_done:
+            bytes[0] = (flip) ? picoquic_frame_type_ping : picoquic_frame_type_padding;
+            break;
+        default:
+            fuzz_pilot >>= 1;
+            bytes[0] ^= (uint8_t)fuzz_pilot;
+            break;
+        }
+    }
+    else {
+        /* Insert any of a set of candidate frames */
+        struct st_insert_t {
+            uint8_t i_type;
+            uint8_t i_count;
+        } insert_table[] = {
+            { picoquic_frame_type_max_data, 2 },
+            { picoquic_frame_type_data_blocked, 2 },
+            { picoquic_frame_type_streams_blocked_bidir, 2 },
+            { picoquic_frame_type_streams_blocked_unidir, 2 },
+            { picoquic_frame_type_retire_connection_id, 2 },
+            { picoquic_frame_type_stream_data_blocked, 3 },
+            { picoquic_frame_type_stop_sending, 3 },
+            { picoquic_frame_type_max_stream_data, 3 },
+            { picoquic_frame_type_max_streams_bidir, 3 },
+            { picoquic_frame_type_max_streams_unidir, 3 },
+            { picoquic_frame_type_reset_stream, 4 }
+        };
+        size_t insert_table_size = sizeof(insert_table) / sizeof(struct st_insert_t);
+        size_t x_i;
+        size_t x_m = insert_table_size;
+        /* find an insert compatible with available size */
+        do {
+            x_i = fuzz_pilot % x_m;
+            x_m = x_i;
+        } while (x_i > 0 && insert_table[x_i].i_count > l);
+        bytes[0] = insert_table[x_i].i_type;
+        fuzz_pilot >>= 4;
+        /* Todo: initialize integer lengths compatible with available space */
+        /* Fuzz that frame */
+        varint_frame_fuzzer(fuzz_pilot, bytes, bytes_max, insert_table[x_i].i_count);
+    }
+}
+
+/* New token fuzzer
+ * Either fuzz one of the 2 parameters, or fuzz the token itself.
+ * Fuzzing the token might cause an issue in a follow on connection.
+ */
+void new_token_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    int x = (fuzz_pilot % 3) == 0;
+    fuzz_pilot >>= 2;
+    if (x){
+        /* fuzz the token */
+        if ((bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL &&
+            (bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL &&
+            (bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL) {
+            fuzz_random_byte(fuzz_pilot, bytes, bytes_max);
+        }
+    }
+    else {
+        varint_frame_fuzzer(fuzz_pilot, bytes, bytes_max, 3);
+    }
+}
+
+/* New CID frame fuzzer 
+ * Either fuzz one of the varint parameters, or in rare cases fuzz the
+ * value of the CID. No point fuzzing the reset token. 
+ * NEW_CONNECTION_ID Frame {
+ *   Type (i) = 0x18,
+ *   Sequence Number (i),
+ *   Retire Prior To (i),
+ *   Length (8),
+ *   Connection ID (8..160),
+ *   Stateless Reset Token (128),
+ * }
+ */
+void new_cid_frame_fuzzer(uint64_t fuzz_pilot, uint8_t* bytes, uint8_t* bytes_max)
+{
+    int x = (fuzz_pilot % 7) == 0;
+    fuzz_pilot >>= 2;
+    if (x) {
+        /* fuzz the token */
+        uint64_t length = 0;
+        if ((bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL &&
+            (bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL &&
+            (bytes = (uint8_t*)picoquic_frames_varint_skip(bytes, bytes_max)) != NULL &&
+            (bytes = (uint8_t*)picoquic_frames_varint_decode(bytes, bytes_max, &length)) != NULL &&
+            length > 0 && (bytes + length) < bytes_max){
+            fuzz_random_byte(fuzz_pilot, bytes, bytes_max);
+        }
+    }
+    else {
+        varint_frame_fuzzer(fuzz_pilot, bytes, bytes_max, 5);
     }
 }
 
@@ -357,15 +514,26 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                 break;
             case picoquic_frame_type_datagram:
             case picoquic_frame_type_datagram_l:
+                datagram_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
+            case picoquic_frame_type_path_challenge:
+            case picoquic_frame_type_path_response:
+                challenge_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
+            case picoquic_frame_type_crypto_hs:
+                /* Not fuzzing the crypto content */
+                varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 3);
+                break;
             case picoquic_frame_type_padding:
             case picoquic_frame_type_ping:
             case picoquic_frame_type_handshake_done:
-            case picoquic_frame_type_crypto_hs:
-            case picoquic_frame_type_path_challenge:
-            case picoquic_frame_type_path_response:
+                padding_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
             case picoquic_frame_type_new_connection_id:
+                new_cid_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                break;
             case picoquic_frame_type_new_token:
-                default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
+                new_token_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
                 break;
             default: {
                 uint64_t frame_id64;
@@ -387,6 +555,9 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 4);
                         break;
                     case picoquic_frame_type_bdp:
+                        /* Not fuzzing the IP address */
+                        varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 5);
+                        break;
                     default:
                         default_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
                         break;
