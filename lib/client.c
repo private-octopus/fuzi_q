@@ -144,10 +144,6 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
                 if (fuzi_q_ctx->config->large_client_hello) {
                     cnx_ctx->cnx_client->test_large_chello = 1;
                 }
-
-                if (fuzi_q_ctx->config->esni_rr_file != NULL) {
-                    ret = picoquic_esni_client_from_file(cnx_ctx->cnx_client, fuzi_q_ctx->config->esni_rr_file);
-                }
             }
 
             if (fuzi_q_ctx->desired_version != 0) {
