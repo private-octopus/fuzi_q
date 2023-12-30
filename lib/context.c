@@ -189,7 +189,7 @@ void fuzi_q_fuzzer_init(fuzzer_ctx_t* fuzz_ctx, picoquic_connection_id_t * init_
 void fuzzer_random_cid(fuzzer_ctx_t* ctx, picoquic_connection_id_t* icid)
 {
     /* Set a hash context for derivation of random CID */
-    void * hash_context = picoquic_hash_create("SHA256");
+    void * hash_context = picoquic_hash_create("sha256");
     uint8_t hash_buffer[256] = { 0 };
     /* Use the CID that was already prepared */
     *icid = ctx->next_cid;
