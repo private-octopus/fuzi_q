@@ -93,7 +93,7 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
     /* Try pick the ALPN and version from tickets if there are any */
 
     if (picoquic_demo_client_get_alpn_and_version_from_tickets(fuzi_q_ctx->quic, PICOQUIC_TEST_SNI, alpn,
-        proposed_version, current_time, &ticket_alpn, &ticket_version) == 0) {
+        proposed_version, &ticket_alpn, &ticket_version) == 0) {
         if (ticket_version != 0) {
             proposed_version = ticket_version;
         }
