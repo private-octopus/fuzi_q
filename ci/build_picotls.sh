@@ -9,7 +9,6 @@ cd ..
 git clone https://github.com/h2o/picotls
 cd picotls
 # git checkout -q "$COMMIT_ID"
-git checkout
 git submodule init
 git submodule update
 cmake $CMAKE_OPTS .
