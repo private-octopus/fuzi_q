@@ -30,7 +30,7 @@
 
 #include <limits.h>
 
-int cyperf_frame_fuzz_type;
+int frame_fuzz_type;
 
 /*
  * Basic fuzz test just tries to flip some bits in random packets
@@ -666,7 +666,7 @@ uint32_t fuzi_q_fuzzer(void* fuzz_ctx, picoquic_cnx_t* cnx,
             size_t fuzz_frame_id = (size_t)((fuzz_pilot >> 3) % nb_fuzi_q_frame_list);
             
             // Fuzzing frames based on the choice provided by the user
-            if (cyperf_frame_fuzz_type!=INT_MIN)	fuzz_frame_id=fuzz_frame_id;
+            if (frame_fuzz_type!=INT_MIN)	fuzz_frame_id=fuzz_frame_id;
 
             size_t len = fuzi_q_frame_list[fuzz_frame_id].len;
             int fuzz_more = ((fuzz_pilot >> 8) & 1) > 0;

@@ -28,7 +28,7 @@
 #include <autoqlog.h>
 #include <performance_log.h>
 #include <tls_api.h>
-#include "cyperf.h"
+#include "frame_select.h"
 #include "fuzi_q.h"
 
 #include <limits.h>
@@ -534,16 +534,16 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
 	
 	displayFuzzingOptions();
 	
-	if(scanf("%d",&cyperf_frame_fuzz_type)!=1){
+	if(scanf("%d",&frame_fuzz_type)!=1){
 		printf("Input error!\n");
 		exit(1);
 	}
-	if(cyperf_frame_fuzz_type>=1 && cyperf_frame_fuzz_type<=57){
-		cyperf_frame_fuzz_type--;
-		printf("Fuzzing %s frames\n\n",fuzi_q_frame_list[cyperf_frame_fuzz_type].name);
+	if(frame_fuzz_type>=1 && frame_fuzz_type<=57){
+		frame_fuzz_type--;
+		printf("Fuzzing %s frames\n\n",fuzi_q_frame_list[frame_fuzz_type].name);
 	}
 	else{
-		cyperf_frame_fuzz_type=INT_MIN;
+		frame_fuzz_type=INT_MIN;
 		printf("All types of frames will be fuzzed!\n\n");
 	}
 
