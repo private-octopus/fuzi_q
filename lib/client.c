@@ -28,7 +28,10 @@
 #include <autoqlog.h>
 #include <performance_log.h>
 #include <tls_api.h>
+#include "cyperf.h"
 #include "fuzi_q.h"
+
+#include <limits.h>
 
 /* The fuzzer can be used with multiple applications, with multiple ALPN.
  * There is no application specific code in the fuzzer. This means the 
@@ -451,6 +454,75 @@ int fuzi_q_client_loop_cb(picoquic_quic_t* quic, picoquic_packet_loop_cb_enum cb
     return ret;
 }
 
+#include <stdio.h>
+
+void displayFuzzingOptions() {
+    printf("=========================================\n");
+    printf("          Frame Fuzzing Options         \n");
+    printf("=========================================\n");
+    printf("Select a frame type to fuzz:\n");
+    printf("  [1] Fuzz Padding Frames\n");
+    printf("  [2] Fuzz Reset Stream Frames\n");
+    printf("  [3] Fuzz Connection Close Frames\n");
+    printf("  [4] Fuzz Application Close Frames\n");
+    printf("  [5] Fuzz Application Close (Reason) Frames\n");
+    printf("  [6] Fuzz Maximum Data Frames\n");
+    printf("  [7] Fuzz Maximum Stream Frames\n");
+    printf("  [8] Fuzz Maximum Streams Bidirectional Frames\n");
+    printf("  [9] Fuzz Maximum Streams Unidirectional Frames\n");
+    printf("  [10] Fuzz Ping Frames\n");
+    printf("  [11] Fuzz Blocked Frames\n");
+    printf("  [12] Fuzz Stream Data Blocked Frames\n");
+    printf("  [13] Fuzz Streams Blocked Bidirectional Frames\n");
+    printf("  [14] Fuzz Streams Blocked Unidirectional Frames\n");
+    printf("  [15] Fuzz New Connection Identifier Frames\n");
+    printf("  [16] Fuzz Stop Sending Frames\n");
+    printf("  [17] Fuzz Challenge Frames\n");
+    printf("  [18] Fuzz Response Frames\n");
+    printf("  [19] Fuzz New Token Frames\n");
+    printf("  [20] Fuzz Acknowledgment Frames\n");
+    printf("  [21] Fuzz Acknowledgment Explicit Congestion Notification Frames\n");
+    printf("  [22] Fuzz Stream Minimum Frames\n");
+    printf("  [23] Fuzz Stream Maximum Frames\n");
+    printf("  [24] Fuzz Cryptographic Handshake Frames\n");
+    printf("  [25] Fuzz Retire Connection Identifier Frames\n");
+    printf("  [26] Fuzz Datagram Frames\n");
+    printf("  [27] Fuzz Datagram Length Frames\n");
+    printf("  [28] Fuzz Handshake Done Frames\n");
+    printf("  [29] Fuzz Acknowledgment Frequency Frames\n");
+    printf("  [30] Fuzz Timestamp Frames\n");
+    printf("  [31] Fuzz Path Abandon 0 Frames\n");
+    printf("  [32] Fuzz Path Abandon 1 Frames\n");
+    printf("  [33] Fuzz Path Abandon 2 Frames\n");
+    printf("  [34] Fuzz Bandwidth-Delay Product Frames\n");
+    printf("  [35] Fuzz Bad Reset Stream Offset Frames\n");
+    printf("  [36] Fuzz Bad Reset Stream Frames\n");
+    printf("  [37] Fuzz Bad Connection Close Frames\n");
+    printf("  [38] Fuzz Bad Application Close Frames\n");
+    printf("  [39] Fuzz Bad Maximum Stream Stream Frames\n");
+    printf("  [40] Fuzz Bad Maximum Streams Bidirectional Frames\n");
+    printf("  [41] Fuzz Bad Maximum Streams Unidirectional Frames\n");
+    printf("  [42] Fuzz Bad New Connection Identifier Length Frames\n");
+    printf("  [43] Fuzz Bad New Connection Identifier Retire Frames\n");
+    printf("  [44] Fuzz Bad Stop Sending Frames\n");
+    printf("  [45] Fuzz Bad New Token Frames\n");
+    printf("  [46] Fuzz Bad Acknowledgment Range Frames\n");
+    printf("  [47] Fuzz Bad Acknowledgment Gaps Frames\n");
+    printf("  [48] Fuzz Bad Acknowledgment Blocks Frames\n");
+    printf("  [49] Fuzz Bad Cryptographic Handshake Frames\n");
+    printf("  [50] Fuzz Bad Datagram Frames\n");
+    printf("  [51] Fuzz Stream Hang Frames\n");
+    printf("  [52] Fuzz Bad Abandon 0 Frames\n");
+    printf("  [53] Fuzz Bad Abandon 1 Frames\n");
+    printf("  [54] Fuzz Bad Abandon 2 Frames\n");
+    printf("  [55] Fuzz Bad Bandwidth-Delay Product Frames\n");
+    printf("  [56] Fuzz Bad Bandwidth-Delay Product Bad Address Frames\n");
+    printf("  [57] Fuzz Bad Bandwidth-Delay Product Bad Length Frames\n");
+    printf("\n");
+    printf("  [0] Fuzz All Frames\n");
+    printf("=========================================\n");
+    printf("Your selection: ");
+}
 
 /* Fuzi Quic Client
  * TODO: manage loop options like key updates, migrations, etc. 
@@ -459,6 +531,22 @@ int fuzi_q_client(fuzi_q_mode_enum fuzz_mode, const char* ip_address_text, int s
     picoquic_quic_config_t* config, size_t nb_cnx_required, uint64_t duration_max,
     picoquic_connection_id_t * init_cid, char const* client_scenario_text)
 {
+	
+	displayFuzzingOptions();
+	
+	if(scanf("%d",&cyperf_frame_fuzz_type)!=1){
+		printf("Input error!\n");
+		exit(1);
+	}
+	if(cyperf_frame_fuzz_type>=1 && cyperf_frame_fuzz_type<=57){
+		cyperf_frame_fuzz_type--;
+		printf("Fuzzing %s frames\n\n",fuzi_q_frame_list[cyperf_frame_fuzz_type].name);
+	}
+	else{
+		cyperf_frame_fuzz_type=INT_MIN;
+		printf("All types of frames will be fuzzed!\n\n");
+	}
+
     /* Start: start the QUIC process with cert and key files */
     int ret = 0;
     fuzi_q_ctx_t fuzi_q_ctx = { 0 };
