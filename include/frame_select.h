@@ -1,1 +1,1 @@
-extern int cyperf_frame_fuzz_type;
+extern int frame_fuzz_type;
