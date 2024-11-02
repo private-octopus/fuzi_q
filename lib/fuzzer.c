@@ -539,8 +539,8 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                 uint64_t frame_id64;
                 if (picoquic_frames_varint_decode(frame_byte, frame_max, &frame_id64) != NULL) {
                     switch (frame_id64) {
-                    case picoquic_frame_type_mp_ack:
-                    case picoquic_frame_type_mp_ack_ecn:
+                    case picoquic_frame_type_ack:
+                    case picoquic_frame_type_ack_ecn:
                         ack_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
                         break;
                     case picoquic_frame_type_ack_frequency:
