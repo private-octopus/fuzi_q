@@ -217,30 +217,35 @@ static uint8_t test_frame_type_time_stamp[] = {
 static uint8_t test_frame_type_path_abandon_0[] = {
     (uint8_t)(0x80 | (picoquic_frame_type_path_abandon >> 24)), (uint8_t)(picoquic_frame_type_path_abandon >> 16),
     (uint8_t)(picoquic_frame_type_path_abandon >> 8), (uint8_t)(picoquic_frame_type_path_abandon & 0xFF),
-    0x00, /* type 0 */
-    0x01,
-    0x00, /* No error */
-    0x00 /* No phrase */
+    0x01, /* Path 0 */
+    0x00 /* No error */
 };
 
 static uint8_t test_frame_type_path_abandon_1[] = {
     (uint8_t)(0x80 | (picoquic_frame_type_path_abandon >> 24)), (uint8_t)(picoquic_frame_type_path_abandon >> 16),
     (uint8_t)(picoquic_frame_type_path_abandon >> 8), (uint8_t)(picoquic_frame_type_path_abandon & 0xFF),
-    0x01, /* type 1 */
     0x01,
-    0x11, /* Some new error */
-    0x03,
-    (uint8_t)'b',
-    (uint8_t)'a',
-    (uint8_t)'d',
+    0x11 /* Some new error */
 };
 
-static uint8_t test_frame_type_path_abandon_2[] = {
-    (uint8_t)(0x80 | (picoquic_frame_type_path_abandon >> 24)), (uint8_t)(picoquic_frame_type_path_abandon >> 16),
-    (uint8_t)(picoquic_frame_type_path_abandon >> 8), (uint8_t)(picoquic_frame_type_path_abandon & 0xFF),
-    0x02, /* type 2, this path */
-    0x00, /* No error */
-    0x00 /* No phrase */
+static uint8_t test_frame_type_path_backup[] = {
+    (uint8_t)(0x80 | (picoquic_frame_type_path_backup >> 24)), (uint8_t)(picoquic_frame_type_path_backup >> 16),
+    (uint8_t)(picoquic_frame_type_path_backup >> 8), (uint8_t)(picoquic_frame_type_path_backup & 0xFF),
+    0x00, /* Path 0 */
+    0x0F, /* Sequence = 0x0F */
+};
+
+static uint8_t test_frame_type_path_available[] = {
+    (uint8_t)(0x80 | (picoquic_frame_type_path_available >> 24)), (uint8_t)(picoquic_frame_type_path_available >> 16),
+    (uint8_t)(picoquic_frame_type_path_available >> 8), (uint8_t)(picoquic_frame_type_path_available & 0xFF),
+    0x00, /* Path 0 */
+    0x0F, /* Sequence = 0x0F */
+};
+
+static uint8_t test_frame_type_path_blocked[] = {
+    (uint8_t)(0x80 | (picoquic_frame_type_path_blocked >> 24)), (uint8_t)(picoquic_frame_type_path_blocked >> 16),
+    (uint8_t)(picoquic_frame_type_path_blocked >> 8), (uint8_t)(picoquic_frame_type_path_blocked & 0xFF),
+    0x11, /* max paths = 17 */
 };
 
 static uint8_t test_frame_type_bdp[] = {
@@ -468,7 +473,9 @@ fuzi_q_frames_t fuzi_q_frame_list[] = {
     FUZI_Q_ITEM("time_stamp", test_frame_type_time_stamp),
     FUZI_Q_ITEM("path_abandon_0", test_frame_type_path_abandon_0),
     FUZI_Q_ITEM("path_abandon_1", test_frame_type_path_abandon_1),
-    FUZI_Q_ITEM("path_abandon_2", test_frame_type_path_abandon_2),
+    FUZI_Q_ITEM("path_available", test_frame_type_path_available),
+    FUZI_Q_ITEM("path_backup", test_frame_type_path_backup),
+    FUZI_Q_ITEM("path_blocked", test_frame_type_path_blocked),
     FUZI_Q_ITEM("bdp", test_frame_type_bdp),
     FUZI_Q_ITEM("bad_reset_stream_offset", test_frame_type_bad_reset_stream_offset),
     FUZI_Q_ITEM("bad_reset_stream", test_frame_type_bad_reset_stream),

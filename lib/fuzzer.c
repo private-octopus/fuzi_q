@@ -539,6 +539,8 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                 uint64_t frame_id64;
                 if (picoquic_frames_varint_decode(frame_byte, frame_max, &frame_id64) != NULL) {
                     switch (frame_id64) {
+                    case picoquic_frame_type_path_ack:
+                    case picoquic_frame_type_path_ack_ecn:
                     case picoquic_frame_type_ack:
                     case picoquic_frame_type_ack_ecn:
                         ack_frame_fuzzer(fuzz_pilot, frame_byte, frame_max);
@@ -551,8 +553,14 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 2);
                         break;
                     case picoquic_frame_type_path_abandon:
-                        /* Not fuzzing the reason string */
-                        varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 4);
+                        varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 3);
+                        break;
+                    case picoquic_frame_type_path_available:
+                    case picoquic_frame_type_path_backup:
+                        varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 3);
+                        break;
+                    case picoquic_frame_type_path_blocked:
+                        varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 2);
                         break;
                     case picoquic_frame_type_bdp:
                         /* Not fuzzing the IP address */
