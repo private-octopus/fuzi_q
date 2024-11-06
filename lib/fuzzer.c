@@ -553,6 +553,7 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 2);
                         break;
                     case picoquic_frame_type_path_abandon:
+                        /* matching multipath draft 11 */
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 3);
                         break;
                     case picoquic_frame_type_path_available:
