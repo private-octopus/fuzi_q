@@ -560,7 +560,7 @@ int frame_header_fuzzer(uint64_t fuzz_pilot,
                     case picoquic_frame_type_path_backup:
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 3);
                         break;
-                    case picoquic_frame_type_path_blocked:
+                    case picoquic_frame_type_paths_blocked:
                         varint_frame_fuzzer(fuzz_pilot, frame_byte, frame_max, 2);
                         break;
                     case picoquic_frame_type_bdp:
