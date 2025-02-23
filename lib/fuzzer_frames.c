@@ -243,8 +243,8 @@ static uint8_t test_frame_type_path_available[] = {
 };
 
 static uint8_t test_frame_type_path_blocked[] = {
-    (uint8_t)(0x80 | (picoquic_frame_type_path_blocked >> 24)), (uint8_t)(picoquic_frame_type_path_blocked >> 16),
-    (uint8_t)(picoquic_frame_type_path_blocked >> 8), (uint8_t)(picoquic_frame_type_path_blocked & 0xFF),
+    (uint8_t)(0x80 | (picoquic_frame_type_paths_blocked >> 24)), (uint8_t)(picoquic_frame_type_paths_blocked >> 16),
+    (uint8_t)(picoquic_frame_type_paths_blocked >> 8), (uint8_t)(picoquic_frame_type_paths_blocked & 0xFF),
     0x11, /* max paths = 17 */
 };
 

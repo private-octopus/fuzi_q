@@ -92,7 +92,8 @@ static fuzzer_icid_ctx_t* create_icid_ctx(fuzzer_ctx_t* ctx, picoquic_connection
     if (icid_ctx != NULL) {
         memset(icid_ctx, 0, sizeof(fuzzer_icid_ctx_t));
         (void)picoquic_parse_connection_id(icid->id, icid->id_len, &icid_ctx->icid);
-        icid_ctx->random_context = picoquic_connection_id_hash(icid);
+        uint8_t default_hash_seed[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        icid_ctx->random_context = picoquic_connection_id_hash(icid, default_hash_seed);
         /* Set the initial values, e.g. target state */
         uint64_t random_state = (icid_ctx->random_context ^ 0xdeadbeefc001cafeull) % fuzzer_cnx_state_max;
         uint64_t random_wait = (icid_ctx->random_context >> 2) ^ 0xa1a2a3a4a5a6a7a8ull;
