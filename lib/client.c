@@ -111,7 +111,7 @@ int fuzi_q_start_connection(fuzi_q_ctx_t* fuzi_q_ctx, fuzi_q_cnx_ctx_t* cnx_ctx,
     }
     else {
         if (fuzi_q_ctx->is_quicperf) {
-            cnx_ctx->quicperf_ctx = quicperf_create_ctx(fuzi_q_ctx->client_scenario_text);
+            cnx_ctx->quicperf_ctx = quicperf_create_ctx(fuzi_q_ctx->client_scenario_text, stderr);
             if (cnx_ctx->quicperf_ctx != NULL) {
                 picoquic_set_callback(cnx_ctx->cnx_client, quicperf_callback, cnx_ctx->quicperf_ctx);
             }
