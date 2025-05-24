@@ -34,6 +34,8 @@
 
 static uint8_t test_frame_type_padding[] = { 0, 0, 0 };
 
+static uint8_t test_frame_type_padding_5_bytes[] = { 0, 0, 0, 0, 0 };
+
 static uint8_t test_frame_type_reset_stream[] = {
     picoquic_frame_type_reset_stream,
     17,
@@ -80,6 +82,11 @@ static uint8_t test_frame_type_max_streams_bidir[] = {
 static uint8_t test_frame_type_max_streams_unidir[] = {
     picoquic_frame_type_max_streams_unidir,
     0x41, 7
+};
+
+static uint8_t test_frame_type_max_streams_bidir_alt[] = {
+    picoquic_frame_type_max_streams_bidir,
+    0x42, 0x0A
 };
 
 static uint8_t test_frame_type_ping[] = {
@@ -442,6 +449,7 @@ static uint8_t test_frame_type_bdp_bad_length[] = {
 
 fuzi_q_frames_t fuzi_q_frame_list[] = {
     FUZI_Q_ITEM("padding", test_frame_type_padding),
+    FUZI_Q_ITEM("padding_5_bytes", test_frame_type_padding_5_bytes),
     FUZI_Q_ITEM("reset_stream", test_frame_type_reset_stream),
     FUZI_Q_ITEM("connection_close", test_type_connection_close),
     FUZI_Q_ITEM("application_close", test_type_application_close),
@@ -450,6 +458,7 @@ fuzi_q_frames_t fuzi_q_frame_list[] = {
     FUZI_Q_ITEM("max_stream_data", test_frame_type_max_stream_data),
     FUZI_Q_ITEM("max_streams_bidir", test_frame_type_max_streams_bidir),
     FUZI_Q_ITEM("max_streams_unidir", test_frame_type_max_streams_unidir),
+    FUZI_Q_ITEM("max_streams_bidir_alt", test_frame_type_max_streams_bidir_alt),
     FUZI_Q_ITEM("ping", test_frame_type_ping),
     FUZI_Q_ITEM("blocked", test_frame_type_blocked),
     FUZI_Q_ITEM("stream_data_blocked", test_frame_type_stream_blocked),
